@@ -1,0 +1,37 @@
+# Enhanced Prior Authorization System CODEOWNERS
+# This file defines code ownership and required reviewers for different components
+# Last matching pattern takes precedence
+# Format: pattern owner1 owner2 ...
+
+# Default owners for any unmatched files - requires architect and security review
+* @epa-architects @epa-security-team
+
+# AI Service - requires AI expertise, security review, and clinical validation
+src/backend/ai-service/** @epa-ai-team @epa-security-team @epa-clinical-team
+
+# Authentication Service - requires security and compliance review
+src/backend/auth-service/** @epa-security-team @epa-backend-team @epa-compliance-team
+
+# Core Workflow Service - requires backend, clinical, and security expertise
+src/backend/workflow-service/** @epa-backend-team @epa-clinical-team @epa-security-team
+
+# Document Service - requires security review and HIPAA compliance validation
+src/backend/document-service/** @epa-backend-team @epa-security-team @epa-compliance-team
+
+# Healthcare Integration Service - requires integration expertise and security review
+src/backend/integration-service/** @epa-backend-team @epa-integration-team @epa-security-team
+
+# Frontend Components - requires UI/UX review and accessibility compliance
+src/web/** @epa-frontend-team @epa-ux-team @epa-accessibility-team
+
+# Infrastructure Configurations - requires DevOps, security, and compliance review
+infrastructure/** @epa-devops-team @epa-security-team @epa-compliance-team
+
+# CI/CD Workflows - requires DevOps and security validation
+.github/workflows/** @epa-devops-team @epa-security-team
+
+# Backend Tests - requires QA and security review
+src/backend/**/tests/** @epa-qa-team @epa-security-team
+
+# Frontend Tests - requires QA and accessibility review
+src/web/**/tests/** @epa-qa-team @epa-accessibility-team
