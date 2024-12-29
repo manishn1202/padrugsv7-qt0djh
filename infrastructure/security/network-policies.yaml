@@ -1,0 +1,250 @@
+# Kubernetes NetworkPolicy API Version: networking.k8s.io/v1
+# Purpose: Define comprehensive zero-trust network security policies for EPA system services
+# Version: 1.27+
+
+# Default deny-all policy implementing zero-trust foundation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: security
+    policy-type: zero-trust
+spec:
+  # Empty pod selector applies to all pods in namespace
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  # Empty ingress/egress rules block all traffic by default
+  ingress: []
+  egress: []
+---
+# API Gateway specific network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-policy
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: api-gateway
+    policy-type: service-specific
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+      component: ingress
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow external HTTPS traffic to API Gateway
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            # Block private network ranges for security
+            except:
+              - 10.0.0.0/8     # Private network
+              - 172.16.0.0/12  # Private network
+              - 192.168.0.0/16 # Private network
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+        - protocol: TCP
+          port: 8443 # Alt HTTPS
+  egress:
+    # Allow API Gateway to communicate only with EPA system services
+    - to:
+        - podSelector:
+            matchLabels:
+              part-of: epa-system
+          namespaceSelector:
+            matchLabels:
+              name: epa-system
+      ports:
+        - protocol: TCP
+          port: 8080  # Service port
+        - protocol: TCP
+          port: 9090  # Metrics port
+---
+# Auth Service network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-policy
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: auth-service
+    policy-type: service-specific
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow only API Gateway to access Auth Service
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow Auth Service to access Redis cache and PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# Workflow Service network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: workflow-service-policy
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: workflow-service
+    policy-type: service-specific
+spec:
+  podSelector:
+    matchLabels:
+      app: workflow-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow API Gateway and other internal services to access Workflow Service
+    - from:
+        - podSelector:
+            matchLabels:
+              part-of: epa-system
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow Workflow Service to access other EPA services and databases
+    - to:
+        - podSelector:
+            matchLabels:
+              part-of: epa-system
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: rabbitmq
+      ports:
+        - protocol: TCP
+          port: 5672
+---
+# Document Service network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: document-service-policy
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: document-service
+    policy-type: service-specific
+spec:
+  podSelector:
+    matchLabels:
+      app: document-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow only internal services to access Document Service
+    - from:
+        - podSelector:
+            matchLabels:
+              part-of: epa-system
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow Document Service to access MongoDB and S3
+    - to:
+        - podSelector:
+            matchLabels:
+              app: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow S3 access via HTTPS
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# AI Service network policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ai-service-policy
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: ai-service
+    policy-type: service-specific
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow only internal services to access AI Service
+    - from:
+        - podSelector:
+            matchLabels:
+              part-of: epa-system
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow AI Service to access internal services and ML model endpoints
+    - to:
+        - podSelector:
+            matchLabels:
+              part-of: epa-system
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Allow SageMaker endpoint access
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
