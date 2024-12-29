@@ -1,0 +1,55 @@
+File Format: ICO (Windows Icon)
+File Size Target: < 5KB
+Color Depth: 32-bit with alpha channel
+
+Required Image Sizes:
+1. 16x16 pixels (browser tabs, bookmarks)
+2. 32x32 pixels (desktop shortcuts)
+3. 48x48 pixels (high-DPI displays, PWA)
+
+Design Specifications:
+- Primary Color: #0066CC (Material Design blue)
+- Background: Transparent
+- Minimum Contrast Ratio: 4.5:1 (WCAG 2.1 AA compliant)
+- Style: Material Design 3.0 principles
+- Icon Design: Simple, recognizable medical/healthcare symbol
+  (e.g., medical cross or shield shape with "PA" text)
+
+Optimization Requirements:
+1. Pixel-perfect alignment for crisp rendering
+2. Optimized compression for web delivery
+3. Alpha channel support for transparency
+4. Dark mode compatibility
+5. High-DPI display optimization
+
+Browser Support:
+- Chrome 90+
+- Firefox 85+
+- Safari 14+
+- Edge 90+
+
+Caching Strategy:
+Cache-Control: public, max-age=31536000
+
+Accessibility Features:
+- Color blind safe design
+- Recognizable shape/silhouette
+- High contrast compatible
+- Clear visibility at small sizes
+
+Technical Implementation Notes:
+1. Use professional icon creation software (e.g., Adobe Photoshop, Affinity Designer)
+2. Export each size separately with pixel-perfect alignment
+3. Combine into single ICO file using icon packaging tool
+4. Verify rendering in all target browsers
+5. Test dark mode compatibility
+6. Validate file size and compression
+7. Confirm accessibility requirements
+```
+
+Note: Since favicon.ico is a binary image file format, I cannot provide the actual binary content in text form. Instead, I've provided comprehensive technical specifications that should be followed when creating the favicon.ico file using appropriate image editing and icon creation software. The specifications ensure compliance with all requirements including browser support, accessibility, and design system guidelines.
+
+The favicon should be referenced in the HTML head section of index.html like this:
+```html
+<link rel="icon" type="image/x-icon" href="/assets/icons/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="/assets/icons/favicon.ico">
