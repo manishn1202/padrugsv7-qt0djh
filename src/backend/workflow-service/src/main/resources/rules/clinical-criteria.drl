@@ -1,0 +1,169 @@
+/*
+ * Enhanced Prior Authorization System - Clinical Criteria Rules
+ * Version: 1.0
+ * 
+ * This Drools rule file implements comprehensive clinical criteria evaluation
+ * for prior authorization decisions with support for:
+ * - Hierarchical ICD-10 code matching
+ * - Multi-factor lab result analysis
+ * - Complex treatment history validation
+ * - Automated and manual review workflows
+ */
+
+package com.epa.workflow.rules;
+
+import com.epa.workflow.models.Authorization;
+import com.epa.workflow.models.AuthorizationStatus;
+import java.util.List;
+import java.util.ArrayList;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+// Global services for external functionality
+global com.epa.workflow.services.ClinicalCriteriaService clinicalCriteriaService;
+global com.epa.workflow.services.AuditService auditService;
+
+// Helper functions for complex evaluations
+function boolean evaluateDiagnosisCriteria(Authorization auth, List<String> requiredCodes) {
+    return clinicalCriteriaService.evaluateDiagnosis(
+        auth.getClinicalInfo().getDiagnosisCodes(),
+        requiredCodes,
+        auth.getClinicalInfo().getDiagnosisHistory()
+    );
+}
+
+function boolean evaluateLabRequirements(Authorization auth, List<String> requirements) {
+    return clinicalCriteriaService.evaluateLabResults(
+        auth.getClinicalInfo().getLabResults(),
+        requirements,
+        auth.getClinicalInfo().getLabHistory()
+    );
+}
+
+function boolean evaluateTreatmentHistory(Authorization auth, List<String> requirements) {
+    return clinicalCriteriaService.evaluateTreatmentHistory(
+        auth.getClinicalInfo().getMedicationHistory(),
+        requirements,
+        auth.getClinicalInfo().getTreatmentDates()
+    );
+}
+
+// Rule for initial clinical criteria evaluation
+rule "Evaluate Clinical Criteria"
+    agenda-group "clinical-evaluation"
+    no-loop true
+    when
+        $auth: Authorization(
+            status == AuthorizationStatus.UNDER_REVIEW,
+            clinicalInfo != null,
+            medicationInfo != null
+        )
+    then
+        // Initialize evaluation results
+        Map<String, Boolean> evaluationResults = new HashMap<>();
+        
+        // Get medication-specific criteria
+        List<String> requiredDiagnoses = clinicalCriteriaService.getRequiredDiagnoses($auth.getMedicationInfo());
+        List<String> requiredLabs = clinicalCriteriaService.getRequiredLabs($auth.getMedicationInfo());
+        List<String> requiredTreatments = clinicalCriteriaService.getRequiredTreatments($auth.getMedicationInfo());
+        
+        // Perform comprehensive evaluation
+        evaluationResults.put("diagnosis", evaluateDiagnosisCriteria($auth, requiredDiagnoses));
+        evaluationResults.put("labs", evaluateLabRequirements($auth, requiredLabs));
+        evaluationResults.put("treatment", evaluateTreatmentHistory($auth, requiredTreatments));
+        
+        // Store results for subsequent rules
+        $auth.getAiAnalysis().setCriteriaResults(evaluationResults);
+        
+        // Audit the evaluation
+        auditService.logCriteriaEvaluation($auth.getAuthorizationId(), evaluationResults);
+        
+        update($auth);
+end
+
+// Rule for automatic approval when all criteria are met
+rule "Auto Approval"
+    agenda-group "approval-decision"
+    no-loop true
+    when
+        $auth: Authorization(
+            status == AuthorizationStatus.UNDER_REVIEW,
+            aiAnalysis != null,
+            aiAnalysis.getCriteriaResults() != null
+        )
+        eval(
+            $auth.getAiAnalysis().getCriteriaResults().get("diagnosis") &&
+            $auth.getAiAnalysis().getCriteriaResults().get("labs") &&
+            $auth.getAiAnalysis().getCriteriaResults().get("treatment")
+        )
+    then
+        // Update authorization status
+        $auth.updateStatus(AuthorizationStatus.APPROVED, "All clinical criteria met - Auto approved");
+        
+        // Log the auto-approval
+        auditService.logAutoApproval(
+            $auth.getAuthorizationId(),
+            $auth.getAiAnalysis().getCriteriaResults()
+        );
+        
+        update($auth);
+end
+
+// Rule for triggering manual review when criteria partially met
+rule "Manual Review Required"
+    agenda-group "approval-decision"
+    no-loop true
+    when
+        $auth: Authorization(
+            status == AuthorizationStatus.UNDER_REVIEW,
+            aiAnalysis != null,
+            aiAnalysis.getCriteriaResults() != null
+        )
+        eval(
+            !$auth.getAiAnalysis().getCriteriaResults().get("diagnosis") ||
+            !$auth.getAiAnalysis().getCriteriaResults().get("labs") ||
+            !$auth.getAiAnalysis().getCriteriaResults().get("treatment")
+        )
+    then
+        // Flag for manual review
+        $auth.getWorkflowInfo().setRequiresManualReview(true);
+        $auth.getWorkflowInfo().setManualReviewReason(
+            clinicalCriteriaService.generateManualReviewReason($auth.getAiAnalysis().getCriteriaResults())
+        );
+        
+        // Log the manual review requirement
+        auditService.logManualReviewRequired(
+            $auth.getAuthorizationId(),
+            $auth.getAiAnalysis().getCriteriaResults()
+        );
+        
+        update($auth);
+end
+
+// Rule for handling missing clinical information
+rule "Missing Clinical Information"
+    agenda-group "clinical-evaluation"
+    no-loop true
+    when
+        $auth: Authorization(
+            status == AuthorizationStatus.UNDER_REVIEW,
+            clinicalInfo != null,
+            eval(
+                clinicalCriteriaService.hasMissingRequiredInformation($auth.getClinicalInfo())
+            )
+        )
+    then
+        // Update status to pending documents
+        $auth.updateStatus(
+            AuthorizationStatus.PENDING_DOCUMENTS,
+            "Missing required clinical information"
+        );
+        
+        // Log the missing information request
+        auditService.logMissingInformation(
+            $auth.getAuthorizationId(),
+            clinicalCriteriaService.getMissingInformationDetails($auth.getClinicalInfo())
+        );
+        
+        update($auth);
+end
