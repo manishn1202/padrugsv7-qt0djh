@@ -1,0 +1,143 @@
+# Prometheus configuration file for Enhanced Prior Authorization System
+# Version: 2.45.0
+
+# Global configuration
+global:
+  scrape_interval: 15s     # How frequently to scrape targets
+  evaluation_interval: 15s  # How frequently to evaluate rules
+  scrape_timeout: 10s      # How long until a scrape request times out
+  external_labels:
+    environment: production
+    region: us-east-1
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+      timeout: 5s
+      api_version: v2
+
+# Rule files to load
+rule_files:
+  - /etc/prometheus/rules/alert.rules
+  - /etc/prometheus/rules/recording.rules
+
+# Scrape configurations
+scrape_configs:
+  # Workflow Service metrics
+  - job_name: workflow-service
+    metrics_path: /actuator/prometheus
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+        - workflow-service:8083
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: application
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'request_processing_time|approval_rate|error_rate|request_volume|active_requests|pending_reviews'
+        action: keep
+
+  # Document Service metrics
+  - job_name: document-service
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+        - document-service:8082
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: application
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'document_processing_time|storage_usage|document_count|processing_queue_length|ocr_accuracy'
+        action: keep
+
+  # AI Service metrics
+  - job_name: ai-service
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+        - ai-service:8085
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        target_label: application
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'inference_time|model_accuracy|prediction_confidence|model_version|gpu_utilization'
+        action: keep
+
+  # Kubernetes API server metrics
+  - job_name: kubernetes-apiservers
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Kubernetes nodes metrics
+  - job_name: kubernetes-nodes
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+  # Kubernetes pods metrics
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+# Alert rules
+# Note: Detailed alert rules are defined in /etc/prometheus/rules/alert.rules
+# Example alert rules included in configuration:
+groups:
+  - name: service-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: High error rate detected
+          description: Error rate is above 5% for the last 5 minutes
+          runbook_url: https://wiki.example.com/alerts/high-error-rate
+
+      - alert: SlowProcessingTime
+        expr: rate(request_processing_time_seconds_sum[5m])/rate(request_processing_time_seconds_count[5m]) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: application
+        annotations:
+          summary: Slow request processing detected
+          description: Average request processing time is above 30 seconds
+          runbook_url: https://wiki.example.com/alerts/slow-processing
