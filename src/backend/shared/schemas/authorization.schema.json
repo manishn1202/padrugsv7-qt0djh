@@ -1,0 +1,342 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Prior Authorization Request Schema",
+  "description": "JSON Schema for validating prior authorization requests with enhanced security and compliance features",
+  "type": "object",
+  "definitions": {
+    "address": {
+      "type": "object",
+      "properties": {
+        "street_line1": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "street_line2": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "city": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z\\s\\-']+$"
+        },
+        "state": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "zip_code": {
+          "type": "string",
+          "pattern": "^\\d{5}(-\\d{4})?$"
+        }
+      },
+      "required": ["street_line1", "city", "state", "zip_code"]
+    }
+  },
+  "properties": {
+    "authorization_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the authorization request"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "SUBMITTED",
+        "PENDING_DOCUMENTS",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "DENIED",
+        "CANCELLED",
+        "EXPIRED"
+      ],
+      "description": "Current status of the authorization request"
+    },
+    "patient_info": {
+      "type": "object",
+      "properties": {
+        "patient_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique patient identifier"
+        },
+        "first_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z\\s\\-']+$"
+        },
+        "last_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z\\s\\-']+$"
+        },
+        "date_of_birth": {
+          "type": "string",
+          "format": "date",
+          "description": "Patient's date of birth in YYYY-MM-DD format"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["M", "F", "OTHER", "UNKNOWN"],
+          "description": "Patient's gender"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "phone": {
+              "type": "string",
+              "pattern": "^\\+?[1-9]\\d{1,14}$",
+              "description": "E.164 format phone number"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            }
+          },
+          "required": ["phone"]
+        },
+        "address": {
+          "$ref": "#/definitions/address"
+        }
+      },
+      "required": ["patient_id", "first_name", "last_name", "date_of_birth", "gender", "contact"]
+    },
+    "insurance_info": {
+      "type": "object",
+      "properties": {
+        "payer_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "plan_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "member_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "group_number": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "coverage_type": {
+          "type": "string",
+          "enum": ["PRIMARY", "SECONDARY", "TERTIARY"]
+        },
+        "prior_authorization_number": {
+          "type": "string",
+          "maxLength": 50
+        }
+      },
+      "required": ["payer_id", "member_id", "coverage_type"]
+    },
+    "medication_info": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "drug_code": {
+          "type": "string",
+          "pattern": "^\\d{4,12}$",
+          "description": "NDC or RxNorm code"
+        },
+        "strength": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "dosage_form": {
+          "type": "string",
+          "enum": ["TABLET", "CAPSULE", "SOLUTION", "SUSPENSION", "INJECTION", "OTHER"]
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMinimum": true
+        },
+        "days_supply": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "directions": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": ["drug_name", "drug_code", "strength", "quantity", "days_supply", "directions"]
+    },
+    "clinical_info": {
+      "type": "object",
+      "properties": {
+        "diagnosis_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]\\d{2}(\\.\\d{1,2})?$",
+            "description": "ICD-10 diagnosis codes"
+          },
+          "minItems": 1
+        },
+        "clinical_history": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "allergies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "lab_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test_name": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "test_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "result_value": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "required": ["test_name", "test_date", "result_value"]
+          }
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "document_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "document_type": {
+                "type": "string",
+                "enum": ["CLINICAL_NOTES", "LAB_REPORT", "PRESCRIPTION", "INSURANCE_CARD", "OTHER"]
+              }
+            },
+            "required": ["document_id", "document_type"]
+          }
+        }
+      },
+      "required": ["diagnosis_codes"]
+    },
+    "provider_info": {
+      "type": "object",
+      "properties": {
+        "provider_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "npi": {
+          "type": "string",
+          "pattern": "^\\d{10}$",
+          "description": "National Provider Identifier"
+        },
+        "first_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z\\s\\-']+$"
+        },
+        "last_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z\\s\\-']+$"
+        },
+        "specialty": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "facility": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "address": {
+          "$ref": "#/definitions/address"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "phone": {
+              "type": "string",
+              "pattern": "^\\+?[1-9]\\d{1,14}$"
+            },
+            "fax": {
+              "type": "string",
+              "pattern": "^\\+?[1-9]\\d{1,14}$"
+            },
+            "email": {
+              "type": "string",
+              "format": "email",
+              "maxLength": 254
+            }
+          },
+          "required": ["phone"]
+        }
+      },
+      "required": ["provider_id", "npi", "first_name", "last_name", "specialty", "contact"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the authorization request was created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the authorization request was last updated"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "source_system": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["ROUTINE", "URGENT", "EMERGENCY"]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        }
+      }
+    }
+  },
+  "required": [
+    "authorization_id",
+    "status",
+    "patient_info",
+    "insurance_info",
+    "medication_info",
+    "clinical_info",
+    "provider_info",
+    "created_at"
+  ],
+  "additionalProperties": false
+}
