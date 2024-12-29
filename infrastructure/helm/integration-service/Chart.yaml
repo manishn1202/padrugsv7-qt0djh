@@ -1,0 +1,43 @@
+# Chart metadata for Enhanced Prior Authorization Integration Service
+# Version: 1.0.0
+# Helm Version: 3.x
+
+apiVersion: v2
+name: integration-service
+description: A Helm chart for the Enhanced Prior Authorization Integration Service that provides seamless integration with healthcare systems using HL7 FHIR, NCPDP SCRIPT, and REST APIs
+version: 1.0.0
+appVersion: 1.0.0
+type: application
+
+# Chart dependencies
+dependencies:
+  - name: common
+    version: 1.x.x
+    repository: https://charts.bitnami.com/bitnami
+
+# Chart maintainers
+maintainers:
+  - name: EPA Platform Team
+    email: platform@epa.healthcare
+
+# Chart keywords for search and categorization
+keywords:
+  - healthcare
+  - integration
+  - fhir
+  - ncpdp
+  - x12
+  - prior-authorization
+  - ehr-integration
+  - pharmacy-integration
+  - insurance-integration
+
+# Chart annotations for additional metadata
+annotations:
+  category: Healthcare
+  licenses: Apache-2.0
+  support: Enterprise
+  healthcheck.enabled: "true"
+  compliance.hipaa: "true"
+  integration.protocols: HL7-FHIR,NCPDP-SCRIPT,REST
+  kubernetes.version: ">=1.27.0"
