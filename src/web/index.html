@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="no-js">
+<head>
+    <!-- Character encoding and compatibility -->
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <!-- Primary meta tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no, viewport-fit=cover">
+    <meta name="description" content="Enhanced Prior Authorization System - Streamlining healthcare prior authorization workflows with AI-powered automation">
+    <meta name="application-name" content="Enhanced PA System">
+    <meta name="theme-color" content="#0066CC">
+    
+    <!-- Apple specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <!-- Security headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';">
+    
+    <!-- Title -->
+    <title>Enhanced Prior Authorization System</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="./src/assets/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="./src/assets/styles/global.css" as="style">
+    <link rel="preload" href="./src/main.tsx" as="script" type="module">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="./src/assets/icons/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="./src/assets/icons/favicon.ico">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="./src/assets/styles/global.css">
+    
+    <!-- Progressive enhancement script -->
+    <script>
+        document.documentElement.classList.remove('no-js');
+        // Feature detection for critical browser features
+        if (!('IntersectionObserver' in window) || 
+            !('fetch' in window) || 
+            !('Promise' in window)) {
+            document.documentElement.classList.add('legacy-browser');
+        }
+    </script>
+</head>
+<body>
+    <!-- Fallback for JavaScript disabled environments -->
+    <noscript>
+        <div style="padding: 20px; text-align: center;">
+            <h1>JavaScript Required</h1>
+            <p>This application requires JavaScript to function. Please enable JavaScript to continue.</p>
+        </div>
+    </noscript>
+    
+    <!-- Application root with accessibility attributes -->
+    <div id="root" role="main" aria-live="polite"></div>
+    
+    <!-- Error boundary container for global errors -->
+    <div id="error-boundary" aria-live="assertive" role="alert"></div>
+    
+    <!-- Loading indicator container -->
+    <div id="loading-overlay" aria-live="polite" role="status"></div>
+    
+    <!-- Application entry point -->
+    <script type="module" src="./src/main.tsx" defer crossorigin="anonymous"></script>
+    
+    <!-- Browser compatibility check -->
+    <script>
+        // Check minimum browser requirements based on technical specifications
+        const minVersions = {
+            chrome: 90,
+            firefox: 85,
+            safari: 14,
+            edge: 90
+        };
+        
+        function checkBrowserCompatibility() {
+            const ua = navigator.userAgent;
+            let browserVersion = 0;
+            
+            if (ua.includes('Chrome/')) {
+                browserVersion = parseInt(ua.split('Chrome/')[1]);
+                return browserVersion >= minVersions.chrome;
+            }
+            if (ua.includes('Firefox/')) {
+                browserVersion = parseInt(ua.split('Firefox/')[1]);
+                return browserVersion >= minVersions.firefox;
+            }
+            if (ua.includes('Safari/') && !ua.includes('Chrome')) {
+                browserVersion = parseInt(ua.split('Version/')[1]);
+                return browserVersion >= minVersions.safari;
+            }
+            if (ua.includes('Edg/')) {
+                browserVersion = parseInt(ua.split('Edg/')[1]);
+                return browserVersion >= minVersions.edge;
+            }
+            return false;
+        }
+        
+        if (!checkBrowserCompatibility()) {
+            console.warn('Browser version does not meet minimum requirements');
+            document.getElementById('root').innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <h1>Browser Update Required</h1>
+                    <p>Please update your browser to the latest version to use this application.</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
