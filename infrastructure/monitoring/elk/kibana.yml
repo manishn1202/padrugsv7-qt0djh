@@ -1,0 +1,144 @@
+# Kibana Configuration File
+# Version: 8.9.0
+# Enhanced Prior Authorization System
+
+#-------------------------- Server Configuration --------------------------
+server:
+  name: "epa-kibana"
+  host: "0.0.0.0"
+  port: 5601
+  publicBaseUrl: "${KIBANA_PUBLIC_URL}"
+  maxPayloadBytes: 10485760
+
+#-------------------------- Elasticsearch Configuration ------------------
+elasticsearch:
+  hosts: ["https://elasticsearch:9200"]
+  ssl:
+    verificationMode: "certificate"
+    certificateAuthorities: ["/etc/kibana/certs/ca.crt"]
+  username: "${ELASTICSEARCH_USERNAME}"
+  password: "${ELASTICSEARCH_PASSWORD}"
+
+#-------------------------- Security Configuration ----------------------
+xpack.security:
+  enabled: true
+  encryptionKey: "${KIBANA_ENCRYPTION_KEY}"
+  session:
+    idleTimeout: "1h"
+    lifespan: "24h"
+  audit:
+    enabled: true
+  authc:
+    providers: ["basic", "saml"]
+    saml:
+      realm: "saml1"
+      protocol: "saml"
+
+#-------------------------- Monitoring Configuration -------------------
+xpack.monitoring:
+  enabled: true
+  kibana:
+    collection:
+      enabled: true
+  ui:
+    container:
+      elasticsearch:
+        enabled: true
+
+#-------------------------- Dashboard Configuration -------------------
+kibana:
+  index_patterns:
+    - name: "workflow-service"
+      pattern: "epa-logs-workflow-*"
+      default: true
+      refresh_interval: "30s"
+    - name: "document-service"
+      pattern: "epa-logs-document-*"
+      refresh_interval: "30s"
+    - name: "ai-service"
+      pattern: "epa-logs-ai-*"
+      refresh_interval: "30s"
+    - name: "integration-service"
+      pattern: "epa-logs-integration-*"
+      refresh_interval: "30s"
+
+#-------------------------- Performance Settings ----------------------
+ops:
+  interval: 5000
+
+cgroup:
+  cpu:
+    path:
+      override: "/"
+  cpuacct:
+    path:
+      override: "/"
+
+logging:
+  dest: "/var/log/kibana/kibana.log"
+  rotate:
+    enabled: true
+    size: "100mb"
+    interval: "24h"
+
+#-------------------------- Security Policies ------------------------
+xpack.security.ssl:
+  enabled: true
+  protocols: ["TLSv1.3"]
+  cipherSuites: [
+    "TLS_AES_256_GCM_SHA384",
+    "TLS_CHACHA20_POLY1305_SHA256"
+  ]
+
+xpack.security.roles:
+  - kibana_admin
+  - kibana_user
+  - monitoring_user
+  - dashboard_user
+
+#-------------------------- HIPAA Compliance Settings ----------------
+xpack.security.audit.appender:
+  type: file
+  layout:
+    type: pattern
+    pattern: "[%d{ISO8601}] [%p] [%c] %m%n"
+
+#-------------------------- Visualization Settings -------------------
+vis_types:
+  timeseries:
+    enabled: true
+  metric:
+    enabled: true
+  table:
+    enabled: true
+  tagcloud:
+    enabled: true
+
+#-------------------------- Reporting Settings ----------------------
+xpack.reporting:
+  enabled: true
+  capture:
+    timeouts:
+      waitForElements: 30000
+  csv:
+    maxSizeBytes: 10485760
+  roles:
+    enabled: true
+
+#-------------------------- APM Integration -------------------------
+apm_oss:
+  enabled: true
+  indexPattern: "apm-*"
+  serviceMapEnabled: true
+
+#-------------------------- Feature Controls ------------------------
+map:
+  enabled: true
+  showMapVisualizationTypes: true
+
+dashboard:
+  allowByValueEmbeddables: true
+
+savedObjects:
+  maxImportPayloadBytes: 26214400
+  maxImportExportSize: 10000
