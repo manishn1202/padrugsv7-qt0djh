@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-service
+  namespace: epa-system
+  labels:
+    app: workflow-service
+    component: backend
+    part-of: epa-system
+    version: 1.0.0
+    tier: application
+    managed-by: kubernetes
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8083"
+    prometheus.io/path: "/actuator/prometheus"
+    kubernetes.io/change-cause: "Initial deployment of workflow service"
+    security.policy/enforce: "strict"
+
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  selector:
+    matchLabels:
+      app: workflow-service
+  
+  template:
+    metadata:
+      labels:
+        app: workflow-service
+        component: backend
+        version: 1.0.0
+    
+    spec:
+      # Security Context for running as non-root
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+
+      # Pod Anti-Affinity for High Availability
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - workflow-service
+              topologyKey: kubernetes.io/hostname
+
+      containers:
+      - name: workflow-service
+        image: workflow-service:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8083
+          protocol: TCP
+          name: http
+        
+        # Resource Limits and Requests
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        
+        # Health Checks
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 30
+        
+        # Environment Configuration
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "production"
+        - name: JAVA_OPTS
+          value: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+        
+        # Volume Mounts
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+      
+      # Volumes
+      volumes:
+      - name: config-volume
+        configMap:
+          name: workflow-service-config
+      - name: secrets-volume
+        secret:
+          secretName: workflow-service-secrets
+      
+      # Grace Period for Pod Termination
+      terminationGracePeriodSeconds: 60
