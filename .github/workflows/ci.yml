@@ -1,0 +1,208 @@
+name: Enhanced PA System CI
+
+# Define workflow triggers
+on:
+  push:
+    branches: [ main, develop, 'feature/*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Configure concurrency to prevent redundant runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Environment variables
+env:
+  NODE_VERSION: '18.x'
+  JAVA_VERSION: '17'
+  PYTHON_VERSION: '3.11'
+  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  COVERAGE_THRESHOLD: '80'
+  TEST_TIMEOUT: '300000'
+  CI_CACHE_KEY: 'v1'
+
+jobs:
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'src/web/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: src/web
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ env.NPM_TOKEN }}" > .npmrc
+          npm ci
+
+      - name: TypeScript type checking
+        working-directory: src/web
+        run: npm run type-check
+
+      - name: ESLint validation
+        working-directory: src/web
+        run: npm run lint
+
+      - name: Run unit tests with coverage
+        working-directory: src/web
+        run: |
+          npm run test:coverage
+          if [ $(jq -r '.total.lines.pct' coverage/coverage-summary.json) -lt ${{ env.COVERAGE_THRESHOLD }} ]; then
+            echo "Coverage below threshold of ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          fi
+
+      - name: Build application
+        working-directory: src/web
+        run: npm run build
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-dist
+          path: src/web/dist
+          retention-days: 5
+
+  backend-services-ci:
+    name: Backend Services CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      matrix:
+        service: [auth, workflow, document, ai]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        if: matrix.service == 'workflow'
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'corretto'
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'maven'
+
+      - name: Setup Node.js
+        if: matrix.service == 'auth'
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'src/backend/auth/package-lock.json'
+
+      - name: Setup Python
+        if: matrix.service == 'document' || matrix.service == 'ai'
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'src/backend/${{ matrix.service }}/requirements.txt'
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ matrix.service }}" = "workflow" ]; then
+            mvn -f src/backend/workflow/pom.xml dependency:go-offline
+          elif [ "${{ matrix.service }}" = "auth" ]; then
+            cd src/backend/auth && npm ci
+          else
+            cd src/backend/${{ matrix.service }} && pip install -r requirements.txt
+          fi
+
+      - name: Run linting and type checking
+        run: |
+          if [ "${{ matrix.service }}" = "workflow" ]; then
+            mvn -f src/backend/workflow/pom.xml checkstyle:check
+          elif [ "${{ matrix.service }}" = "auth" ]; then
+            cd src/backend/auth && npm run lint && npm run type-check
+          else
+            cd src/backend/${{ matrix.service }} && python -m pylint . && python -m mypy .
+          fi
+
+      - name: Run tests with coverage
+        run: |
+          if [ "${{ matrix.service }}" = "workflow" ]; then
+            mvn -f src/backend/workflow/pom.xml test jacoco:report
+          elif [ "${{ matrix.service }}" = "auth" ]; then
+            cd src/backend/auth && npm run test:coverage
+          else
+            cd src/backend/${{ matrix.service }} && python -m pytest --cov=. --cov-report=xml
+          fi
+
+      - name: Build service
+        run: |
+          if [ "${{ matrix.service }}" = "workflow" ]; then
+            mvn -f src/backend/workflow/pom.xml package -DskipTests
+          elif [ "${{ matrix.service }}" = "auth" ]; then
+            cd src/backend/auth && npm run build
+          else
+            cd src/backend/${{ matrix.service }} && python -m build
+          fi
+
+      - name: Upload service artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.service }}-build
+          path: |
+            src/backend/${{ matrix.service }}/target/*.jar
+            src/backend/${{ matrix.service }}/dist
+            src/backend/${{ matrix.service }}/build
+          retention-days: 5
+
+  integration-tests:
+    name: Integration Tests
+    needs: [frontend-ci, backend-services-ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          ./scripts/wait-for-services.sh
+
+      - name: Run API integration tests
+        run: |
+          npm run test:integration
+        env:
+          TEST_TIMEOUT: ${{ env.TEST_TIMEOUT }}
+
+      - name: Run E2E tests
+        run: |
+          npm run test:e2e
+        env:
+          TEST_TIMEOUT: ${{ env.TEST_TIMEOUT }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: |
+            test-results/
+            integration-results/
+            e2e-results/
+          retention-days: 5
