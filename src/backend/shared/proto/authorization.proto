@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+package epa.authorization;
+
+// External imports
+import "google/protobuf/timestamp.proto"; // v3.0.0 - Standard timestamp type
+import "document.proto"; // Internal import for document handling
+
+// Go package declaration for code generation
+option go_package = "github.com/epa/proto/authorization";
+
+// AuthorizationService provides enterprise-grade gRPC endpoints for managing prior authorization requests
+service AuthorizationService {
+  // Creates a new prior authorization request with comprehensive validation
+  rpc CreateAuthorization(CreateAuthorizationRequest) returns (AuthorizationResponse) {}
+  
+  // Retrieves authorization request details with security checks
+  rpc GetAuthorization(GetAuthorizationRequest) returns (Authorization) {}
+  
+  // Updates authorization request status with comprehensive error handling
+  rpc UpdateStatus(UpdateStatusRequest) returns (Authorization) {}
+  
+  // Streams real-time authorization updates with connection management
+  rpc StreamUpdates(StreamUpdatesRequest) returns (stream AuthorizationUpdate) {}
+}
+
+// Authorization represents a complete prior authorization request with full audit support
+message Authorization {
+  string authorization_id = 1;  // Unique identifier for the authorization request
+  PatientInfo patient_info = 2;  // Patient demographic information
+  MedicationInfo medication_info = 3;  // Requested medication details
+  ClinicalInfo clinical_info = 4;  // Supporting clinical information
+  AuthorizationStatus status = 5;  // Current authorization status
+  repeated epa.document.Document documents = 6;  // Associated clinical documents
+  google.protobuf.Timestamp created_at = 7;  // Creation timestamp
+  google.protobuf.Timestamp updated_at = 8;  // Last modification timestamp
+  string created_by = 9;  // User ID of request creator
+  string assigned_to = 10;  // User ID of assigned reviewer
+  AuditInfo audit_info = 11;  // Audit trail information
+}
+
+// PatientInfo contains comprehensive patient demographics
+message PatientInfo {
+  string patient_id = 1;  // Unique patient identifier
+  string first_name = 2;  // Patient first name
+  string last_name = 3;  // Patient last name
+  string date_of_birth = 4;  // Date of birth (YYYY-MM-DD)
+  string gender = 5;  // Patient gender
+  InsuranceInfo insurance = 6;  // Insurance information
+  ContactInfo contact = 7;  // Contact information
+}
+
+// MedicationInfo contains detailed medication request information
+message MedicationInfo {
+  string medication_name = 1;  // Requested medication name
+  string ndc_code = 2;  // National Drug Code
+  string strength = 3;  // Medication strength
+  string form = 4;  // Dosage form
+  string quantity = 5;  // Requested quantity
+  string days_supply = 6;  // Days supply
+  string directions = 7;  // Administration directions
+  bool is_generic_ok = 8;  // Generic substitution allowed
+  repeated string previous_medications = 9;  // Prior medication history
+}
+
+// ClinicalInfo contains supporting clinical documentation
+message ClinicalInfo {
+  repeated string diagnosis_codes = 1;  // ICD-10 diagnosis codes
+  string clinical_rationale = 2;  // Treatment rationale
+  repeated LabResult lab_results = 3;  // Relevant lab results
+  repeated string contraindications = 4;  // Known contraindications
+  map<string, string> custom_fields = 5;  // Additional clinical data
+}
+
+// InsuranceInfo contains comprehensive insurance details
+message InsuranceInfo {
+  string payer_id = 1;  // Insurance payer identifier
+  string plan_id = 2;  // Insurance plan identifier
+  string group_number = 3;  // Group number
+  string member_id = 4;  // Member identifier
+  string bin = 5;  // BIN number
+  string pcn = 6;  // PCN number
+}
+
+// ContactInfo contains patient contact details
+message ContactInfo {
+  string phone = 1;  // Primary phone number
+  string email = 2;  // Email address
+  Address address = 3;  // Physical address
+}
+
+// Address contains structured address information
+message Address {
+  string street1 = 1;  // Street address line 1
+  string street2 = 2;  // Street address line 2
+  string city = 3;  // City
+  string state = 4;  // State/province
+  string zip_code = 5;  // Postal code
+  string country = 6;  // Country code
+}
+
+// LabResult contains laboratory test results
+message LabResult {
+  string test_name = 1;  // Test name
+  string test_code = 2;  // Test code
+  string result_value = 3;  // Result value
+  string unit = 4;  // Measurement unit
+  google.protobuf.Timestamp test_date = 5;  // Test date
+}
+
+// AuditInfo tracks authorization request changes
+message AuditInfo {
+  repeated StatusChange status_history = 1;  // Status change history
+  repeated string workflow_events = 2;  // Workflow event log
+  map<string, string> metadata = 3;  // Additional audit metadata
+}
+
+// StatusChange records status transitions
+message StatusChange {
+  AuthorizationStatus from_status = 1;  // Previous status
+  AuthorizationStatus to_status = 2;  // New status
+  string changed_by = 3;  // User ID making change
+  string reason = 4;  // Change reason
+  google.protobuf.Timestamp changed_at = 5;  // Change timestamp
+}
+
+// AuthorizationStatus enumerates possible authorization states
+enum AuthorizationStatus {
+  AUTHORIZATION_STATUS_UNSPECIFIED = 0;  // Default unspecified state
+  PENDING = 1;  // Initial submission pending
+  IN_REVIEW = 2;  // Under review
+  APPROVED = 3;  // Approved
+  DENIED = 4;  // Denied
+  CANCELLED = 5;  // Cancelled
+  NEEDS_INFO = 6;  // Additional information required
+  APPEALED = 7;  // Under appeal
+}
+
+// CreateAuthorizationRequest for new authorization requests
+message CreateAuthorizationRequest {
+  PatientInfo patient_info = 1;
+  MedicationInfo medication_info = 2;
+  ClinicalInfo clinical_info = 3;
+  repeated epa.document.Document documents = 4;
+}
+
+// AuthorizationResponse contains created authorization details
+message AuthorizationResponse {
+  Authorization authorization = 1;  // Created authorization
+  string workflow_id = 2;  // Associated workflow ID
+}
+
+// GetAuthorizationRequest for retrieving authorization details
+message GetAuthorizationRequest {
+  string authorization_id = 1;  // Authorization identifier
+  bool include_documents = 2;  // Include associated documents
+}
+
+// UpdateStatusRequest for status updates
+message UpdateStatusRequest {
+  string authorization_id = 1;  // Authorization identifier
+  AuthorizationStatus new_status = 2;  // New status
+  string reason = 3;  // Update reason
+  map<string, string> metadata = 4;  // Additional update metadata
+}
+
+// StreamUpdatesRequest for real-time updates
+message StreamUpdatesRequest {
+  string authorization_id = 1;  // Authorization identifier
+  repeated AuthorizationStatus status_filter = 2;  // Optional status filters
+}
+
+// AuthorizationUpdate for streaming updates
+message AuthorizationUpdate {
+  string authorization_id = 1;  // Authorization identifier
+  AuthorizationStatus status = 2;  // Current status
+  string update_type = 3;  // Update type
+  map<string, string> metadata = 4;  // Update metadata
+  google.protobuf.Timestamp timestamp = 5;  // Update timestamp
+}
