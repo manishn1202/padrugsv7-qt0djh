@@ -1,0 +1,196 @@
+# AI Service Deployment Manifest
+# Version: 1.0.0
+# Purpose: GPU-enabled AI service deployment for Enhanced Prior Authorization System
+# Dependencies: pytorch/pytorch:2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: epa-system
+  labels:
+    app: ai-service
+    component: backend
+    part-of: epa-system
+    version: v1
+    tier: ai-processing
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ai-service
+  minReadySeconds: 30
+  revisionHistoryLimit: 5
+  template:
+    metadata:
+      labels:
+        app: ai-service
+        component: backend
+        part-of: epa-system
+        version: v1
+        tier: ai-processing
+    spec:
+      # Security Context for Pod
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      # Container Specification
+      containers:
+      - name: ai-service
+        image: pytorch/pytorch:2.0
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+            - ALL
+        
+        # Container Ports
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        # Resource Requirements
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+            nvidia.com/gpu: "1"
+        
+        # Environment Variables
+        envFrom:
+        - configMapRef:
+            name: ai-service-config
+        - secretRef:
+            name: ai-service-secrets
+        
+        # Volume Mounts
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/models
+          readOnly: true
+        - name: tmp-storage
+          mountPath: /app/tmp
+        - name: cache-storage
+          mountPath: /app/cache
+        
+        # Health Checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            scheme: HTTPS
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 8080
+            scheme: HTTPS
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 30
+      
+      # Volumes
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: ai-model-pvc
+      - name: tmp-storage
+        emptyDir:
+          sizeLimit: 5Gi
+          medium: Memory
+      - name: cache-storage
+        emptyDir:
+          sizeLimit: 2Gi
+          medium: Memory
+      
+      # Node Selection and Scheduling
+      nodeSelector:
+        gpu: "true"
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
+        node.kubernetes.io/instance-type: g4dn.2xlarge
+      
+      # GPU Tolerations
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      - key: gpu
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      
+      # Affinity Rules
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: gpu
+                operator: In
+                values:
+                - "true"
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - ai-service
+              topologyKey: kubernetes.io/hostname
+      
+      # Service Account
+      serviceAccountName: ai-service-sa
+      
+      # Image Pull Secrets
+      imagePullSecrets:
+      - name: registry-credentials
