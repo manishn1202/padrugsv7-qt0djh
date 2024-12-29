@@ -1,0 +1,261 @@
+# Enhanced Prior Authorization System API Gateway Values
+# Kong Version: 3.0
+# HIPAA-compliant configuration for healthcare data processing
+
+# Override name configurations
+nameOverride: ""
+fullnameOverride: ""
+
+# High availability configuration
+replicaCount: 3
+
+# Container image configuration
+image:
+  repository: kong
+  tag: "3.0"
+  pullPolicy: IfNotPresent
+
+# Service account configuration with AWS IAM integration
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ${IAM_ROLE_ARN}
+  name: "api-gateway-sa"
+
+# Pod annotations for monitoring and secrets management
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8001"
+  prometheus.io/path: "/metrics"
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "api-gateway"
+
+# Enhanced security context for HIPAA compliance
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    http:
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    admin:
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+    metrics:
+      port: 9542
+      targetPort: 9542
+      protocol: TCP
+
+# Ingress configuration with enhanced security
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "8m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+  hosts:
+    - host: api.epa-system.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: api-gateway-tls
+      hosts:
+        - api.epa-system.com
+
+# Resource allocation
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Horizontal pod autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Pod distribution and scheduling rules
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - api-gateway
+        topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-type
+              operator: In
+              values:
+                - api-gateway
+
+# Kong specific configuration
+kong:
+  env:
+    database: "off"
+    proxy_access_log: /dev/stdout
+    admin_access_log: /dev/stdout
+    proxy_error_log: /dev/stderr
+    admin_error_log: /dev/stderr
+    admin_listen: "0.0.0.0:8001"
+    log_level: notice
+    ssl_cert: /etc/kong/tls.crt
+    ssl_cert_key: /etc/kong/tls.key
+
+  # Plugin configuration for security and monitoring
+  plugins:
+    # JWT Authentication
+    - name: jwt
+      config:
+        uri: ${AUTH0_DOMAIN}
+        audience: ${AUTH0_AUDIENCE}
+        algorithms:
+          - RS256
+        claims_to_verify:
+          - exp
+          - iss
+          - sub
+
+    # Rate Limiting
+    - name: rate-limiting
+      config:
+        minute: 1000
+        policy: redis
+        fault_tolerant: true
+        hide_client_headers: false
+        redis_ssl: true
+        redis_ssl_verify: true
+
+    # CORS Configuration
+    - name: cors
+      config:
+        origins:
+          - https://*.epa-system.com
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        headers:
+          - Authorization
+          - Content-Type
+          - X-Request-ID
+        exposed_headers:
+          - X-RateLimit-Limit
+          - X-RateLimit-Remaining
+        credentials: true
+        max_age: 3600
+
+    # Request Transformation
+    - name: request-transformer
+      config:
+        add:
+          headers:
+            - "X-Request-ID:${request_id}"
+
+    # Response Transformation
+    - name: response-transformer
+      config:
+        add:
+          headers:
+            - "Strict-Transport-Security:max-age=31536000; includeSubDomains"
+
+  # Route configuration for microservices
+  routes:
+    - name: workflow-service
+      paths: ["/api/v1/authorizations"]
+      strip_path: false
+      service: workflow-service
+      plugins: ["jwt", "rate-limiting"]
+
+    - name: document-service
+      paths: ["/api/v1/documents"]
+      strip_path: false
+      service: document-service
+      plugins: ["jwt", "rate-limiting"]
+
+    - name: ai-service
+      paths: ["/api/v1/analysis"]
+      strip_path: false
+      service: ai-service
+      plugins: ["jwt", "rate-limiting"]
+
+    - name: integration-service
+      paths: ["/api/v1/integrations"]
+      strip_path: false
+      service: integration-service
+      plugins: ["jwt", "rate-limiting"]
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+    namespace: monitoring
+    labels:
+      release: prometheus
+  prometheusRules:
+    enabled: true
+    rules:
+      - alert: APIGatewayHighErrorRate
+        expr: sum(rate(kong_http_status{code=~"5.."}[5m])) / sum(rate(kong_http_status[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+
+# Redis configuration for rate limiting
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+    existingSecret: redis-credentials
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 8Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
