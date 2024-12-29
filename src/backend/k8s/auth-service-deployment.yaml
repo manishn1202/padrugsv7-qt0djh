@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: epa-system
+  labels:
+    app: auth-service
+    component: authentication
+    part-of: epa-system
+    version: latest
+    tier: backend
+    managed-by: kubectl
+  annotations:
+    security.policy/version: "v1.0.0"
+    description: "OAuth 2.0 + OIDC Authentication Service"
+    hipaa.compliance/enabled: "true"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        version: latest
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3001"
+        prometheus.io/path: "/metrics"
+        security.policy/version: "v1.0.0"
+        checksum/secrets: "${SECRETS_CHECKSUM}"
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: auth-service-sa
+      containers:
+        - name: auth-service
+          # node:18-alpine based auth service image
+          image: epa-system/auth-service:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3001
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3001"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: METRICS_PORT
+              value: "9090"
+          envFrom:
+            - secretRef:
+                name: auth-service-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3001
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: auth-service-certs
+              mountPath: /etc/certs
+              readOnly: true
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: auth-service-certs
+          secret:
+            secretName: auth-service-certs
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - auth-service
+                topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 300
