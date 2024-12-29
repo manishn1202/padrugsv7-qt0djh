@@ -1,0 +1,167 @@
+**/.git
+**/.gitignore
+**/.gitattributes
+**/.svn
+**/CVS
+
+# Development Environment
+**/.idea/
+**/.vscode/
+**/.eclipse/
+**/.settings/
+**/.project
+**/.classpath
+**/.factorypath
+**/.env*
+**/.editorconfig
+**/.eslintrc*
+**/.prettierrc*
+**/.babelrc*
+
+# Dependencies
+## Node.js
+**/node_modules/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.npm/
+**/package-lock.json
+**/yarn.lock
+
+## Java/Maven
+**/target/
+**/.m2/
+**/*.jar
+**/*.war
+**/gradle/
+**/.gradle/
+**/build/
+**/*.class
+
+## Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/.env
+**/.venv/
+**/env/
+**/venv/
+**/.tox/
+**/*.egg-info/
+**/*.egg
+
+# Testing and Coverage
+**/coverage/
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/test/
+**/tests/
+**/__tests__/
+**/*.test.*
+**/*.spec.*
+**/junit.xml
+**/test-results/
+
+# Build Artifacts
+**/dist/
+**/build/
+**/.next/
+**/out/
+**/*.o
+**/*.obj
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+
+# Documentation
+**/docs/
+**/README*
+**/LICENSE*
+**/CHANGELOG*
+**/CONTRIBUTING*
+**/CODE_OF_CONDUCT*
+
+# Logs and Debugging
+**/logs/
+**/*.log
+**/log/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.DS_Store
+**/Thumbs.db
+
+# Security Sensitive
+**/.env*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.crt
+**/*.cer
+**/secrets/
+**/credentials.*
+**/.htpasswd
+**/.htaccess
+
+# Docker
+**/Dockerfile*
+**/.dockerignore
+**/docker-compose*.yml
+
+# Temporary Files
+**/tmp/
+**/temp/
+**/*.tmp
+**/*.temp
+**/*.swp
+**/*.swo
+**/*~
+
+# Large Media & Binary Files
+**/*.zip
+**/*.tar
+**/*.gz
+**/*.rar
+**/*.7z
+**/*.iso
+**/*.pdf
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.gif
+**/*.ico
+**/*.svg
+**/*.mp4
+**/*.avi
+**/*.mov
+
+# IDE and Editor Files
+**/*.sublime-*
+**/*.code-workspace
+**/.history/
+**/.settings/
+**/.project
+**/.buildpath
+
+# Kubernetes and Infrastructure
+**/k8s/
+**/*.yaml
+**/*.yml
+!**/application.yml
+!**/prometheus-config.yml
+
+# Miscellaneous
+**/README.md
+**/LICENSE
+**/CHANGELOG.md
+**/.git*
+**/.travis.yml
+**/.gitlab-ci.yml
+**/circle.yml
+**/appveyor.yml
+**/azure-pipelines.yml
