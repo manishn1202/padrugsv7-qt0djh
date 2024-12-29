@@ -1,0 +1,207 @@
+name: Continuous Deployment
+
+# Trigger on successful CI workflow completion or manual dispatch
+on:
+  workflow_run:
+    workflows: ["Enhanced PA System CI"]
+    branches: [main, develop]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      deployment_type:
+        description: 'Deployment Type'
+        required: true
+        type: choice
+        options:
+          - full
+          - partial
+
+# Environment variables
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+  KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  HIPAA_COMPLIANCE_KEY: ${{ secrets.HIPAA_COMPLIANCE_KEY }}
+  AUDIT_LOG_KEY: ${{ secrets.AUDIT_LOG_KEY }}
+  SECURITY_SCAN_TOKEN: ${{ secrets.SECURITY_SCAN_TOKEN }}
+
+# Concurrency control to prevent parallel deployments
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  security-compliance-check:
+    name: Security and Compliance Verification
+    runs-on: ubuntu-latest
+    environment: shared
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: HIPAA compliance verification
+        run: |
+          echo "Verifying HIPAA compliance requirements..."
+          ./scripts/verify-hipaa-compliance.sh
+        env:
+          COMPLIANCE_KEY: ${{ env.HIPAA_COMPLIANCE_KEY }}
+
+      - name: Security vulnerability scan
+        run: |
+          echo "Running security vulnerability scan..."
+          ./scripts/security-scan.sh
+        env:
+          SCAN_TOKEN: ${{ env.SECURITY_SCAN_TOKEN }}
+
+      - name: Artifact validation
+        run: |
+          echo "Validating deployment artifacts..."
+          ./scripts/validate-artifacts.sh
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-compliance-reports
+          path: reports/
+          retention-days: 30
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [security-compliance-check]
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 45
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          registries: ${{ env.ECR_REGISTRY }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Set Kubernetes context
+        uses: azure/k8s-set-context@v2
+        with:
+          kubeconfig: ${{ env.KUBE_CONFIG }}
+          cluster-type: aws
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          ./scripts/deploy.sh staging
+        env:
+          DEPLOY_ENV: staging
+          HELM_VALUES: ${{ secrets.STAGING_HELM_VALUES }}
+
+      - name: Run compliance tests
+        run: |
+          echo "Running compliance verification tests..."
+          ./scripts/verify-compliance.sh staging
+
+      - name: Verify deployment health
+        run: |
+          echo "Verifying deployment health..."
+          ./scripts/health-check.sh staging
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+
+    steps:
+      - name: Manual approval check
+        run: |
+          echo "Waiting for manual approval..."
+          # Manual approval is enforced through environment protection rules
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
+
+      - name: Enhanced security verification
+        run: |
+          echo "Performing enhanced security checks..."
+          ./scripts/security-verify.sh production
+
+      - name: Canary deployment
+        run: |
+          echo "Initiating canary deployment..."
+          ./scripts/canary-deploy.sh
+        env:
+          CANARY_PERCENTAGE: 10
+
+      - name: Monitor canary health
+        run: |
+          echo "Monitoring canary deployment health..."
+          ./scripts/monitor-canary.sh
+
+      - name: Full production rollout
+        if: success()
+        run: |
+          echo "Rolling out to full production..."
+          ./scripts/production-deploy.sh
+        env:
+          DEPLOY_ENV: production
+          HELM_VALUES: ${{ secrets.PRODUCTION_HELM_VALUES }}
+
+      - name: Verify HIPAA compliance
+        run: |
+          echo "Verifying HIPAA compliance in production..."
+          ./scripts/verify-hipaa-compliance.sh production
+
+      - name: Generate deployment report
+        if: always()
+        run: |
+          echo "Generating deployment report..."
+          ./scripts/generate-deploy-report.sh
+
+      - name: Upload deployment status
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-status
+          path: |
+            reports/deployment-status.json
+            reports/compliance-verification.json
+            reports/security-audit.json
+          retention-days: 90
