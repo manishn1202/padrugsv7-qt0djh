@@ -1,0 +1,132 @@
+# Kubernetes RBAC Configuration v1.27+
+# Purpose: Define comprehensive role-based access control policies for EPA system services
+# Security Level: High
+# Audit Requirements: Enabled
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: api-gateway-role
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: api-gateway
+    security.epa.io/audit-level: high
+    security.epa.io/compliance-level: high
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+    # Explicit namespace restriction for API Gateway
+    namespaces: ["epa-system"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: auth-service-role
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: auth-service
+    security.epa.io/audit-level: critical
+    security.epa.io/compliance-level: high
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+    # Explicit resource name constraints for auth secrets
+    resourceNames: ["auth-secrets", "jwt-keys"]
+    namespaces: ["epa-security"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workflow-service-role
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: workflow-service
+    security.epa.io/audit-level: high
+    security.epa.io/compliance-level: high
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+    resourceNames: ["workflow-config", "workflow-secrets"]
+    namespaces: ["epa-system"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: api-gateway-binding
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    security.epa.io/audit-level: high
+subjects:
+  - kind: ServiceAccount
+    name: api-gateway-sa
+    namespace: epa-system
+roleRef:
+  kind: ClusterRole
+  name: api-gateway-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: auth-service-binding
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    security.epa.io/audit-level: critical
+subjects:
+  - kind: ServiceAccount
+    name: auth-service-sa
+    namespace: epa-security
+roleRef:
+  kind: ClusterRole
+  name: auth-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workflow-service-binding
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    security.epa.io/audit-level: high
+subjects:
+  - kind: ServiceAccount
+    name: workflow-service-sa
+    namespace: epa-system
+roleRef:
+  kind: ClusterRole
+  name: workflow-service-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Namespace-specific roles for additional security controls
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: monitoring-reader
+  namespace: epa-monitoring
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: monitoring
+    security.epa.io/audit-level: medium
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: monitoring-reader-binding
+  namespace: epa-monitoring
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    security.epa.io/audit-level: medium
+subjects:
+  - kind: ServiceAccount
+    name: monitoring-sa
+    namespace: epa-monitoring
+roleRef:
+  kind: Role
+  name: monitoring-reader
+  apiGroup: rbac.authorization.k8s.io
