@@ -1,0 +1,188 @@
+# AI Service Helm Values Configuration
+# Version: 1.0.0
+# Dependencies: pytorch/pytorch:2.0
+
+# Replica count for horizontal scaling
+replicaCount: 2
+
+# Container image configuration
+image:
+  repository: pytorch/pytorch
+  tag: "2.0"
+  pullPolicy: Always
+  pullSecrets:
+    - name: registry-credentials
+
+# Service account configuration
+serviceAccount:
+  create: true
+  name: "ai-service-sa"
+  annotations: {}
+
+# Pod deployment strategy
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Resource allocation for AI processing
+resources:
+  requests:
+    cpu: "4"
+    memory: "8Gi"
+    nvidia.com/gpu: "1"
+  limits:
+    cpu: "8"
+    memory: "16Gi"
+    nvidia.com/gpu: "1"
+
+# Node selection for GPU instances
+nodeSelector:
+  gpu: "true"
+  cloud.google.com/gke-accelerator: nvidia-tesla-t4
+  node.kubernetes.io/instance-type: g4dn.2xlarge
+
+# GPU tolerations
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  - key: gpu
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+# Pod affinity rules
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: gpu
+              operator: In
+              values:
+                - "true"
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+                - amd64
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - ai-service
+          topologyKey: kubernetes.io/hostname
+
+# Security context configuration
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+      - ALL
+
+# AI model configuration
+config:
+  model:
+    name: "gpt-4"
+    maxTokens: 8192
+    temperature: 0.7
+    maxRetries: 3
+    timeoutSeconds: 30.0
+    confidenceThreshold: 0.85
+    batchSize: 32
+  logging:
+    level: "INFO"
+    format: "json"
+
+# Persistent storage configuration
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"
+  size: "100Gi"
+  mountPath: "/app/models"
+  volumes:
+    tmp:
+      size: "5Gi"
+      medium: Memory
+    cache:
+      size: "2Gi"
+      medium: Memory
+
+# Health check probes
+probes:
+  startup:
+    httpGet:
+      path: /startup
+      port: 8080
+      scheme: HTTPS
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
+  liveness:
+    httpGet:
+      path: /health
+      port: 8080
+      scheme: HTTPS
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    httpGet:
+      path: /ready
+      port: 8080
+      scheme: HTTPS
+    initialDelaySeconds: 45
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  metricsPort: 9090
+
+# Prometheus metrics configuration
+metrics:
+  enabled: true
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+
+# Environment variables configuration
+env:
+  configMapRef:
+    name: ai-service-config
+  secretRef:
+    name: ai-service-secrets
+
+# Network policy
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: workflow-service
+        - podSelector:
+            matchLabels:
+              app: document-service
+      ports:
+        - port: 8080
+          protocol: TCP
