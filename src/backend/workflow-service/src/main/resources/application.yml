@@ -1,0 +1,201 @@
+# Enhanced Prior Authorization System - Workflow Service Configuration
+# Version: 1.0
+# Supports HIPAA compliance, high availability, and enterprise-grade security
+
+spring:
+  application:
+    name: workflow-service
+  
+  # Database Configuration with Enhanced Security
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:epa_workflow}?ssl=true&sslmode=verify-full&sslcert=${SSL_CERT_PATH}&sslkey=${SSL_KEY_PATH}&sslrootcert=${SSL_ROOT_CERT_PATH}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+      pool-name: workflow-hikari-pool
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+
+  # JPA Configuration with Performance Optimizations
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 50
+          fetch_size: 100
+        order_inserts: true
+        order_updates: true
+        connection:
+          provider_disables_autocommit: true
+        query:
+          in_clause_parameter_padding: true
+        generate_statistics: false
+        session:
+          events:
+            log:
+              LOG_QUERIES_SLOWER_THAN_MS: 250
+
+  # Redis Cache Configuration
+  cache:
+    type: redis
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000
+      ssl: true
+      password: ${REDIS_PASSWORD}
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES}
+        max-redirects: 3
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000
+
+  # Security Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH0_DOMAIN}
+          jwk-set-uri: ${AUTH0_DOMAIN}/.well-known/jwks.json
+    headers:
+      frame-options: DENY
+      content-security-policy: "default-src 'self'; frame-ancestors 'none'"
+      strict-transport-security: max-age=31536000; includeSubDomains; preload
+      x-content-type-options: nosniff
+      x-xss-protection: 1; mode=block
+      referrer-policy: strict-origin-when-cross-origin
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8083}
+  servlet:
+    context-path: /api/v1
+  tomcat:
+    max-threads: 200
+    accept-count: 100
+    max-connections: 8192
+    connection-timeout: 5000
+  ssl:
+    enabled: true
+    key-store: ${SSL_KEYSTORE_PATH}
+    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    key-alias: ${SSL_KEY_ALIAS}
+    trust-store: ${SSL_TRUSTSTORE_PATH}
+    trust-store-password: ${SSL_TRUSTSTORE_PASSWORD}
+
+# Management & Monitoring Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+      base-path: /actuator
+      cors:
+        allowed-origins: ${ALLOWED_ORIGINS}
+        allowed-methods: GET
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+        step: 1m
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      sla:
+        http.server.requests: 100ms,500ms
+  health:
+    probes:
+      enabled: true
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    redis:
+      enabled: true
+    db:
+      enabled: true
+
+# Drools Rules Engine Configuration
+drools:
+  rules:
+    path: classpath:rules/clinical-criteria.drl
+    reload-enabled: true
+    reload-interval: 300
+    scan-directories: rules/**/*.drl
+    validation:
+      enabled: true
+      strict: true
+    execution:
+      pool-size: 10
+      timeout: 5000
+
+# Logging Configuration
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.epa.workflow: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+  file:
+    name: ${LOG_PATH:/var/log/epa}/workflow-service.log
+    max-size: 100MB
+    max-history: 30
+
+# Resilience4j Circuit Breaker Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      defaultCB:
+        slidingWindowSize: 100
+        permittedNumberOfCallsInHalfOpenState: 10
+        waitDurationInOpenState: 10000
+        failureRateThreshold: 50
+  retry:
+    instances:
+      defaultRetry:
+        maxAttempts: 3
+        waitDuration: 1000
+  ratelimiter:
+    instances:
+      defaultRL:
+        limitForPeriod: 1000
+        limitRefreshPeriod: 1m
+        timeoutDuration: 5s
+
+# Custom Application Properties
+app:
+  async:
+    core-pool-size: 8
+    max-pool-size: 50
+    queue-capacity: 10000
+  cache:
+    default-ttl: 3600
+    authorization-ttl: 1800
+  security:
+    allowed-origins: ${ALLOWED_ORIGINS}
+    api-key-header: X-API-Key
+    rate-limit-per-ip: 1000
+  workflow:
+    auto-approval-enabled: true
+    manual-review-threshold: 0.8
+    document-retention-days: 90
