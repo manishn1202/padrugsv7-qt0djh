@@ -1,0 +1,146 @@
+# Enhanced Prior Authorization System - Workflow Service Helm Values
+# Version: 1.0.0
+# Supports enterprise-grade deployment with HIPAA compliance and high availability
+
+# Core deployment configuration
+replicaCount: 3
+image:
+  repository: workflow-service
+  tag: latest
+  pullPolicy: IfNotPresent
+  # amazoncorretto:17 base image
+
+# Pod disruption budget for high availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: "50%"
+
+# Service account configuration with AWS IAM role
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/workflow-service-role
+  name: workflow-service
+
+# Pod annotations for monitoring and security
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8083"
+  prometheus.io/path: "/actuator/prometheus"
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "workflow-service"
+
+# Enhanced security context for HIPAA compliance
+podSecurityContext:
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 3000
+
+# Container security context
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8083
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+
+# Resource limits and requests based on technical specifications
+resources:
+  limits:
+    cpu: "4"
+    memory: 8Gi
+  requests:
+    cpu: "2"
+    memory: 4Gi
+
+# Horizontal pod autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Pod anti-affinity for high availability across zones
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - workflow-service
+        topologyKey: topology.kubernetes.io/zone
+
+# Environment variables
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  SERVER_PORT: "8083"
+  JAVA_OPTS: "-Xms2g -Xmx4g -XX:+UseG1GC -XX:+HeapDumpOnOutOfMemoryError -XX:MaxGCPauseMillis=200"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  OTEL_RESOURCE_ATTRIBUTES: "service.name=workflow-service"
+
+# ConfigMap for application configuration
+configMap:
+  enabled: true
+  data:
+    application.yml: |
+      spring:
+        application:
+          name: workflow-service
+        security:
+          require-ssl: true
+
+# Secret management
+secret:
+  enabled: true
+  type: Opaque
+  mountPath: /etc/secrets
+
+# Health probes configuration
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: 8083
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: 8083
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Metrics configuration
+metrics:
+  serviceMonitor:
+    enabled: true
+    interval: "15s"
+    path: /actuator/prometheus
+    labels:
+      release: prometheus
+
+# Network policy for secure communication
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-gateway
