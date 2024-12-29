@@ -1,0 +1,84 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "lib": ["ES2022", "DOM"],
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    
+    /* Module Resolution */
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./shared/types"
+    ],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    
+    /* Experimental Features */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    
+    /* Advanced */
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  
+  "references": [
+    { "path": "./api-gateway" },
+    { "path": "./auth-service" }
+  ],
+  
+  "include": [
+    "shared/**/*"
+  ],
+  
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true,
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  },
+  
+  "watchOptions": {
+    "watchFile": "useFsEvents",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "dynamicPriority",
+    "synchronousWatchDirectory": true,
+    "excludeDirectories": ["**/node_modules", "dist"]
+  }
+}
