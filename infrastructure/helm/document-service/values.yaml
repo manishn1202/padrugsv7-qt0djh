@@ -1,0 +1,162 @@
+# Default values for document-service Helm chart
+# This is a YAML-formatted file.
+
+# Number of replicas for high availability
+replicaCount: 3
+
+# Container image configuration
+image:
+  repository: epa-system/document-service
+  tag: 1.0.0
+  pullPolicy: Always
+
+# Service account configuration for AWS IAM roles
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/document-service-role
+  name: document-service-sa
+
+# Pod annotations for monitoring and secrets management
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: /metrics
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "document-service"
+
+# Security context for pod-level security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Security context for container-level security
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
+
+# Resource requests and limits
+resources:
+  limits:
+    cpu: "4"
+    memory: 8Gi
+    nvidia.com/gpu: "1"
+  requests:
+    cpu: "2"
+    memory: 4Gi
+
+# Horizontal Pod Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+
+# Node selection for GPU-enabled nodes
+nodeSelector:
+  gpu: "true"
+  workload-type: document-processing
+
+# Pod anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: document-service
+
+# MongoDB configuration
+mongodb:
+  enabled: true
+  architecture: replicaset
+  replicaCount: 3
+  auth:
+    enabled: true
+    rootPassword: ""  # Set via external secret
+    username: document-service
+    database: document-db
+    existingSecret: mongodb-credentials
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: encrypted-gp3
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Redis configuration
+redis:
+  enabled: true
+  architecture: replicaset
+  auth:
+    enabled: true
+    password: ""  # Set via external secret
+    existingSecret: redis-credentials
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: encrypted-gp3
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Environment variables
+env:
+  PYTHON_ENV: production
+  PORT: "8080"
+  LOG_LEVEL: info
+  MONGODB_HOST: document-service-mongodb
+  REDIS_HOST: document-service-redis-master
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  AI_MODEL_PATH: /models/document-processor
+
+# Health check probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 2
+
+# Volume mounts for AI models and temporary storage
+volumeMounts:
+  - name: models
+    mountPath: /models
+    readOnly: true
+  - name: tmp
+    mountPath: /tmp
+
+# Volume definitions
+volumes:
+  - name: models
+    persistentVolumeClaim:
+      claimName: ai-models-pvc
+  - name: tmp
+    emptyDir: {}
