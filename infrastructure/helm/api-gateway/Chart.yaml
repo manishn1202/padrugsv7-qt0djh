@@ -1,0 +1,57 @@
+# API Gateway Helm Chart for Enhanced Prior Authorization System
+# Version: 1.0.0
+# Kong Version: 3.0.x
+# HIPAA-compliant healthcare API Gateway configuration
+
+apiVersion: v2
+name: epa-api-gateway
+description: Enhanced Prior Authorization System API Gateway powered by Kong, providing secure routing, authentication, and request management for healthcare data
+type: application
+version: 1.0.0
+appVersion: "3.0.0"
+
+# Keywords for chart discovery and categorization
+keywords:
+  - api-gateway
+  - kong
+  - healthcare
+  - authorization
+  - hipaa-compliant
+  - prior-authorization
+  - medical-data
+
+# Chart maintainer information
+maintainers:
+  - name: EPA System Team
+    email: team@epa-system.com
+    url: https://epa-system.com/support
+
+# Chart dependencies
+dependencies:
+  - name: kong
+    version: 3.0.x
+    repository: https://charts.konghq.com
+    condition: kong.enabled
+    tags:
+      - api-gateway
+      - ingress-controller
+
+# Additional annotations
+annotations:
+  category: Infrastructure
+  compliance: HIPAA
+  licenses: Apache-2.0
+  support: https://epa-system.com/support
+
+# Home URL for the project
+home: https://epa-system.com
+
+# Source code repository
+sources:
+  - https://github.com/epa-system/epa-api-gateway
+
+# Icon URL for the chart
+icon: https://epa-system.com/assets/logo.png
+
+# Kubernetes version requirements
+kubeVersion: ">=1.21.0-0"
