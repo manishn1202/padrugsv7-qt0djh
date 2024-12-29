@@ -1,0 +1,79 @@
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist
+build
+.next
+*.tsbuildinfo
+
+# Test and coverage
+coverage
+tests
+__tests__
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Development tools and IDE
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Environment and secrets
+.env*
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Documentation
+README.md
+CHANGELOG.md
+docs
+*.md
+
+# Configuration files not needed in production
+.eslintrc*
+.prettierrc*
+.babelrc*
+jest.config.*
+tsconfig.*
+webpack.config.*
+
+# Temporary files
+*.log
+*.tmp
+.cache
+tmp
+
+# Debug files
+*.map
+debug.log
+
+# Assets source files (only built assets needed)
+src/assets/raw
+*.sketch
+*.fig
+*.xd
+*.psd
+
+# Misc development files
+docker-compose*
+Dockerfile*
+.dockerignore
+.editorconfig
+.nvmrc
+.npmrc
