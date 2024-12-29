@@ -1,0 +1,78 @@
+[tool.poetry]
+name = "document-service"
+version = "1.0.0"
+description = "Document processing microservice for Enhanced Prior Authorization System with advanced security and processing capabilities"
+authors = ["EPA Development Team <dev@epa.example.com>"]
+license = "Proprietary"
+readme = "README.md"
+python = "^3.11"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "0.100.0"  # High-performance API framework with OpenAPI support
+uvicorn = "0.22.0"  # ASGI server with HTTP/2 support
+motor = "3.1.1"  # Async MongoDB driver
+python-multipart = "0.0.6"  # Multipart form parsing for file uploads
+pydantic = "2.0.0"  # Data validation with JSON schema support
+python-jose = {extras = ["cryptography"], version = "3.3.0"}  # JWT handling
+passlib = {extras = ["bcrypt"], version = "1.7.4"}  # Password hashing
+bcrypt = "4.0.1"  # Modern password hashing
+aiofiles = "23.1.0"  # Async file operations
+python-magic = "0.4.27"  # File type detection
+minio = "7.1.15"  # S3-compatible storage client
+
+[tool.poetry.group.dev.dependencies]
+pytest = "7.4.0"  # Testing framework
+pytest-asyncio = "0.21.0"  # Async testing support
+pytest-cov = "4.1.0"  # Test coverage reporting
+black = "23.3.0"  # Code formatting
+isort = "5.12.0"  # Import sorting
+flake8 = "6.0.0"  # Code linting
+mypy = "1.4.0"  # Static type checking
+
+[build-system]
+requires = ["poetry-core>=1.6.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+
+[tool.mypy]
+python_version = "3.11"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+strict_optional = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --cov=src --cov-report=term-missing"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "raise ImportError",
+    "except ImportError:",
+]
