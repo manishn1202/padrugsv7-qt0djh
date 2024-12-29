@@ -1,0 +1,73 @@
+# Helm Chart for Enhanced Prior Authorization System Authentication Service
+# Version: 1.0.0
+# HIPAA & FIPS 140-2 Compliant Authentication Service
+
+apiVersion: v2
+name: auth-service
+description: Authentication Service for Enhanced Prior Authorization System providing OAuth 2.0 + OIDC with Auth0 integration
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+# Keywords for chart discovery and categorization
+keywords:
+  - authentication
+  - oauth2
+  - oidc
+  - auth0
+  - epa-system
+  - healthcare
+  - security
+  - hipaa-compliant
+
+# Maintainer information
+maintainers:
+  - name: EPA System Team
+    email: epa-team@organization.com
+    url: https://organization.com/epa-team
+
+# Chart dependencies
+dependencies:
+  # Ingress controller for handling incoming traffic
+  - name: nginx
+    version: ^15.0.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: nginx.enabled
+    tags:
+      - ingress
+
+  # Redis for session management and caching
+  - name: redis
+    version: ^17.0.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - cache
+
+# Engine compatibility requirements
+engine:
+  node: ">=18.0.0"
+  kubernetes: ">=1.24.0"
+
+# Additional metadata annotations
+annotations:
+  artifacthub.io/changes: |
+    - Initial release of Auth Service Helm chart
+    - Integrated OAuth 2.0 + OIDC with Auth0
+    - Added HIPAA compliance controls
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/signKey: "fingerprint: 0123456789abcdef"
+
+# Home URL for the project
+home: https://organization.com/epa-system
+
+# Source code repository
+sources:
+  - https://github.com/organization/epa-system
+
+# Icon URL for the chart
+icon: https://organization.com/epa-system/icons/auth-service.png
+
+# Kubeversion compatibility
+kubeVersion: ">=1.24.0"
