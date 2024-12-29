@@ -1,0 +1,94 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: epa-system-ingress
+  namespace: epa-system
+  annotations:
+    # AWS ALB Controller Configuration
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "${AWS_CERT_ARN}"
+    alb.ingress.kubernetes.io/ssl-policy: "ELBSecurityPolicy-TLS13-1-2-2021-06"
+    
+    # Health Check Configuration
+    alb.ingress.kubernetes.io/healthcheck-path: "/health"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "10"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    alb.ingress.kubernetes.io/success-codes: "200-399"
+    
+    # Security Configuration
+    alb.ingress.kubernetes.io/waf-acl-id: "${WAF_ACL_ID}"
+    alb.ingress.kubernetes.io/shield-advanced-protection: "true"
+    alb.ingress.kubernetes.io/group.name: "epa-system"
+    
+    # Rate Limiting and DDoS Protection
+    alb.ingress.kubernetes.io/actions.rate-limit: |
+      {
+        "type": "fixed-response",
+        "fixedResponseConfig": {
+          "contentType": "application/json",
+          "statusCode": "429",
+          "messageBody": "{\"error\":\"rate limit exceeded\"}"
+        }
+      }
+    
+    # Enhanced Features
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=${ACCESS_LOG_BUCKET},
+      idle_timeout.timeout_seconds=60
+    
+    # Security Headers
+    alb.ingress.kubernetes.io/response-headers: |
+      strict-transport-security=max-age=31536000; includeSubDomains; preload,
+      x-content-type-options=nosniff,
+      x-frame-options=DENY,
+      x-xss-protection=1; mode=block,
+      content-security-policy=default-src 'self',
+      referrer-policy=strict-origin-when-cross-origin
+    
+    # HIPAA Compliance
+    hipaa.compliance/enabled: "true"
+    hipaa.compliance/audit-logging: "true"
+    hipaa.compliance/encryption: "true"
+
+spec:
+  tls:
+  - hosts:
+    - api.epa-system.com
+    secretName: epa-tls-secret
+  
+  rules:
+  - host: api.epa-system.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 8000
+      
+      # Rate limiting path
+      - path: /rate-limit
+        pathType: Prefix
+        backend:
+          service:
+            name: rate-limit
+            port:
+              number: 80
+
+      # Health check endpoint
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 8000
