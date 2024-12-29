@@ -1,0 +1,155 @@
+# Spring Boot Integration Service Configuration v3.1.0
+# Enhanced configuration for secure healthcare system integrations
+
+spring:
+  application:
+    name: integration-service
+  
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  
+  # Cloud configuration for service discovery and resilience
+  cloud:
+    discovery:
+      enabled: true
+      service-id: integration-service
+    circuit-breaker:
+      enabled: true
+      default:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 60000
+        permittedNumberOfCallsInHalfOpenState: 5
+
+# Server configuration with mTLS security
+server:
+  port: ${SERVER_PORT:8083}
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    key-store-password: ${SSL_KEY_STORE_PASSWORD}
+    key-store-type: PKCS12
+    client-auth: need
+    trust-store: classpath:truststore.p12
+    trust-store-password: ${SSL_TRUST_STORE_PASSWORD}
+    protocol: TLS
+    enabled-protocols: [TLSv1.2, TLSv1.3]
+    ciphers: >
+      TLS_AES_256_GCM_SHA384,
+      TLS_CHACHA20_POLY1305_SHA256,
+      TLS_AES_128_GCM_SHA256
+
+# Integration endpoints configuration
+integration:
+  # FHIR integration settings
+  fhir:
+    server-url: ${FHIR_SERVER_URL}
+    version: R4
+    client-id: ${FHIR_CLIENT_ID}
+    client-secret: ${FHIR_CLIENT_SECRET}
+    connection-timeout: 5000
+    socket-timeout: 10000
+    versions-supported: [R4, R5]
+    retry:
+      max-attempts: 3
+      initial-interval: 1000
+      multiplier: 2.0
+    security:
+      oauth2-required: true
+      validate-server-certificate: true
+
+  # Insurance/PBM integration settings
+  insurance:
+    api-url: ${INSURANCE_API_URL}
+    api-key: ${INSURANCE_API_KEY}
+    x12-version: "5010"
+    timeout: 30000
+    retry:
+      max-attempts: 3
+      backoff:
+        initial-interval: 1000
+        multiplier: 2.0
+        max-interval: 10000
+    security:
+      encryption-enabled: true
+      sensitive-fields: [member_id, group_number]
+
+  # Pharmacy system integration settings
+  pharmacy:
+    script-version: "20170714"
+    endpoint-url: ${PHARMACY_ENDPOINT_URL}
+    credentials:
+      username: ${PHARMACY_USERNAME}
+      password: ${PHARMACY_PASSWORD}
+      rotation-schedule: "0 0 1 * *"
+    retry:
+      enabled: true
+      max-attempts: 3
+
+# Security configuration
+security:
+  oauth2:
+    client-id: ${OAUTH_CLIENT_ID}
+    client-secret: ${OAUTH_CLIENT_SECRET}
+    token-uri: ${OAUTH_TOKEN_URI}
+    scope: [integration.read, integration.write]
+    token-validity: 3600
+    auto-renew: true
+  
+  encryption:
+    key-store: classpath:encryption-keys.jks
+    key-store-password: ${ENCRYPTION_KEY_STORE_PASSWORD}
+    key-alias: integration-key
+    algorithm: AES
+    key-size: 256
+  
+  rate-limit:
+    enabled: true
+    limit: 1000
+    duration: 1m
+
+# Monitoring and metrics configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: [health, metrics, prometheus, integrationhealth]
+      base-path: /actuator
+  
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+        step: 30s
+    distribution:
+      percentiles: [0.5, 0.75, 0.95, 0.99]
+      slo: [100, 200, 500]
+  
+  health:
+    show-details: always
+    probes:
+      enabled: true
+    integration:
+      fhir:
+        enabled: true
+        timeout: 5000
+      insurance:
+        enabled: true
+        timeout: 5000
+      pharmacy:
+        enabled: true
+        timeout: 5000
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.epa.integration: DEBUG
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/integration-service.log
+    max-size: 100MB
+    max-history: 30
