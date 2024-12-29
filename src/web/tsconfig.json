@@ -1,0 +1,85 @@
+{
+  "compilerOptions": {
+    // Modern ECMAScript target for specified browser compatibility
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    
+    // Module system configuration
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    
+    // React configuration
+    "jsx": "react-jsx",
+    
+    // Strict type checking
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    
+    // JavaScript interop
+    "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    
+    // Build safety
+    "forceConsistentCasingInFileNames": true,
+    
+    // Path aliases for clean imports
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@services/*": ["src/services/*"],
+      "@utils/*": ["src/utils/*"],
+      "@types/*": ["src/types/*"],
+      "@assets/*": ["src/assets/*"],
+      "@styles/*": ["src/styles/*"]
+    },
+    
+    // Type definitions
+    "types": [
+      "vite/client",
+      "jest",
+      "@testing-library/jest-dom",
+      "node",
+      "react",
+      "react-dom"
+    ]
+  },
+  
+  // Source files to include
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vite.config.ts",
+    "jest.config.ts"
+  ],
+  
+  // Files/folders to exclude
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    ".docker",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ],
+  
+  // Project references
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ]
+}
