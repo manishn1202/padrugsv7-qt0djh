@@ -1,0 +1,180 @@
+# Auth Service Helm Values Configuration
+# Version: 1.0.0
+# FIPS 140-2 Compliant Authentication Service Configuration
+
+# Replica count for high availability
+replicaCount: 3
+
+# Container image configuration
+image:
+  repository: epa-system/auth-service
+  tag: latest
+  pullPolicy: Always
+
+# Service naming
+nameOverride: "auth-service"
+fullnameOverride: "epa-auth-service"
+
+# Service account configuration with AWS IAM integration
+serviceAccount:
+  create: true
+  name: "auth-service-sa"
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/auth-service-role"
+
+# Pod annotations for monitoring and secrets management
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3001"
+  prometheus.io/path: "/metrics"
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "auth-service"
+
+# Enhanced security context for pod
+podSecurityContext:
+  fsGroup: 1000
+  fsGroupChangePolicy: "OnRootMismatch"
+  runAsUser: 1000
+  runAsGroup: 1000
+  runAsNonRoot: true
+  seccompProfile:
+    type: "RuntimeDefault"
+
+# Container security context
+securityContext:
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 3001
+  targetPort: 3001
+
+# Ingress configuration with TLS and security headers
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+  hosts:
+    - host: auth.epa-system.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: auth-tls-secret
+      hosts:
+        - auth.epa-system.local
+
+# Resource limits and requests
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+# Horizontal Pod Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+
+# Node selection and affinity rules
+nodeSelector:
+  kubernetes.io/os: linux
+  node-type: auth-service
+
+# Pod tolerations
+tolerations:
+  - key: "auth-service"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# Affinity rules for high availability
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - auth-service
+        topologyKey: kubernetes.io/hostname
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-type
+              operator: In
+              values:
+                - auth-service
+
+# Environment variables
+env:
+  NODE_ENV: "production"
+  PORT: "3001"
+  LOG_LEVEL: "info"
+  METRICS_ENABLED: "true"
+
+# Auth0 configuration secrets (to be populated by external secrets manager)
+secrets:
+  auth0:
+    domain: ""
+    clientId: ""
+    clientSecret: ""
+    audience: ""
+    tokenSigningAlg: "RS256"
+    tokenExpirationTime: 3600
+    jwksUri: ""
+
+# Health check probes
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 30
+  successThreshold: 1
