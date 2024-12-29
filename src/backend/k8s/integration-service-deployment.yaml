@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integration-service
+  namespace: epa-system
+  labels:
+    app: integration-service
+    component: backend
+    part-of: epa-system
+    version: latest
+    tier: integration
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8083"
+    prometheus.io/path: "/actuator/prometheus"
+    kubernetes.io/change-cause: "Updated resource limits and security settings"
+    security.cloud.google.com/cosign-verification: "true"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: integration-service
+  template:
+    metadata:
+      labels:
+        app: integration-service
+        version: latest
+        tier: integration
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+    spec:
+      containers:
+      - name: integration-service
+        image: epa-system/integration-service:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8083
+          protocol: TCP
+          name: http
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "production"
+        - name: SERVER_PORT
+          value: "8083"
+        envFrom:
+        - configMapRef:
+            name: integration-service-config
+        - secretRef:
+            name: integration-service-secrets
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 45
+          periodSeconds: 15
+          failureThreshold: 10
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: secrets-volume
+          mountPath: /app/secrets
+          readOnly: true
+        - name: certs-volume
+          mountPath: /app/certs
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: integration-service-config
+      - name: secrets-volume
+        secret:
+          secretName: integration-service-secrets
+      - name: certs-volume
+        secret:
+          secretName: integration-service-certs
+      - name: tmp-volume
+        emptyDir: {}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: integration-service-sa
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - integration-service
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "node-role"
+        operator: "Equal"
+        value: "integration"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-role: integration
