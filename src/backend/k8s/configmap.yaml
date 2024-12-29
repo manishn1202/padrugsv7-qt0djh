@@ -1,0 +1,175 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: epa-system-config
+  namespace: epa
+  labels:
+    app: epa-system
+    environment: production
+    version: "1.0.0"
+data:
+  # Global Settings
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  CORRELATION_ID_HEADER: "X-Correlation-ID"
+  REQUEST_ID_HEADER: "X-Request-ID"
+  HEALTH_CHECK_ENDPOINT: "/health"
+
+  # Workflow Service Configuration
+  workflow-service.yaml: |
+    spring:
+      application:
+        name: workflow-service
+      profiles:
+        active: production
+      jpa:
+        hibernate:
+          ddl-auto: validate
+        show-sql: false
+        properties:
+          hibernate:
+            dialect: org.hibernate.dialect.PostgreSQLDialect
+            jdbc:
+              batch_size: 50
+              fetch_size: 100
+      cache:
+        type: redis
+        redis:
+          timeout: 2000
+          cluster:
+            max-redirects: 3
+          lettuce:
+            pool:
+              max-active: 8
+              max-idle: 8
+              min-idle: 2
+    
+    server:
+      port: 8083
+      tomcat:
+        max-threads: 200
+        accept-count: 100
+        max-connections: 8192
+    
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,metrics,prometheus,circuitbreakers
+      health:
+        probes:
+          enabled: true
+    
+    resilience4j:
+      circuitbreaker:
+        instances:
+          default:
+            slidingWindowSize: 100
+            failureRateThreshold: 50
+            waitDurationInOpenState: 60s
+            permittedNumberOfCallsInHalfOpenState: 10
+
+  # AI Service Configuration
+  ai-service.yaml: |
+    model:
+      name: gpt-4
+      version: 1.0.0
+      max_tokens: 8192
+      temperature: 0.7
+      max_retries: 3
+      timeout_seconds: 30.0
+      confidence_threshold: 0.85
+      batch_size: 32
+      batch_timeout_ms: 5000
+      error_retry_backoff_ms: 1000
+    
+    monitoring:
+      enabled: true
+      metrics_export_interval: 60
+      health_check_interval: 30
+    
+    performance:
+      model_cache_size: 1000
+      model_cache_ttl_seconds: 3600
+      max_concurrent_requests: 100
+      request_timeout_seconds: 30
+
+  # Document Service Configuration
+  document-service.yaml: |
+    app:
+      name: EPA Document Service
+      version: 1.0.0
+    
+    mongodb:
+      database: epa_documents
+      collection: documents
+      max_pool_size: 100
+      min_pool_size: 10
+      max_idle_time_ms: 10000
+      connect_timeout_ms: 20000
+      socket_timeout_ms: 30000
+      server_selection_timeout_ms: 30000
+      replica_set: rs0
+      read_preference: primaryPreferred
+      write_concern: majority
+    
+    storage:
+      s3_bucket: epa-documents
+      s3_backup_bucket: epa-documents-backup
+      max_file_size: 104857600
+      encryption_enabled: true
+      encryption_type: AES256
+      backup_enabled: true
+      backup_interval_hours: 24
+      backup_retention_days: 90
+      storage_class: STANDARD_IA
+      multipart_threshold: 104857600
+      multipart_chunksize: 10485760
+    
+    security:
+      cors_origins: "*"
+      rate_limit:
+        enabled: true
+        requests_per_second: 100
+    
+    ai_service:
+      timeout: 30
+      max_retries: 3
+      batch_size: 10
+      health_check:
+        enabled: true
+        interval_seconds: 30
+      metrics:
+        enabled: true
+        export_interval_seconds: 60
+
+  # API Gateway Configuration
+  api-gateway.yaml: |
+    server:
+      port: 8080
+      compression:
+        enabled: true
+        mime-types: application/json,application/xml,text/plain
+        min-response-size: 2048
+    
+    rate-limiting:
+      enabled: true
+      default-policy:
+        requests-per-second: 100
+        burst-size: 200
+    
+    cors:
+      allowed-origins: "*"
+      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+      allowed-headers: Authorization,Content-Type,X-Request-ID
+      max-age: 3600
+    
+    security:
+      ssl:
+        enabled: true
+        protocol: TLSv1.2
+      headers:
+        frame-options: DENY
+        content-security-policy: "default-src 'self'"
+        strict-transport-security: "max-age=31536000; includeSubDomains"
