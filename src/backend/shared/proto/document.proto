@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package epa.document;
+
+// External imports
+import "google/protobuf/timestamp.proto"; // v3.0.0 - Standard timestamp type
+
+// Go package declaration for code generation
+option go_package = "github.com/epa/proto/document";
+
+// DocumentService provides gRPC endpoints for secure document management
+service DocumentService {
+  // UploadDocument handles secure streaming upload of clinical documents
+  rpc UploadDocument(stream UploadDocumentRequest) returns (Document) {}
+  
+  // GetDocument retrieves document details with access control validation
+  rpc GetDocument(GetDocumentRequest) returns (Document) {}
+  
+  // UpdateProcessingStatus manages document processing state transitions
+  rpc UpdateProcessingStatus(UpdateProcessingStatusRequest) returns (Document) {}
+}
+
+// Document represents a clinical document with enhanced security and tracking
+message Document {
+  string document_id = 1;  // Unique identifier for the document
+  string authorization_id = 2;  // Associated prior authorization request ID
+  DocumentMetadata metadata = 3;  // Document metadata and classification
+  string content_location = 4;  // Secure storage location URI
+  ProcessingStatus processing_status = 5;  // Current processing state
+  AIAnalysis ai_analysis = 6;  // AI processing results
+  string uploaded_by = 7;  // User ID of document uploader
+  google.protobuf.Timestamp created_at = 8;  // Document creation timestamp
+  google.protobuf.Timestamp updated_at = 9;  // Last modification timestamp
+}
+
+// DocumentType enumerates supported clinical document categories
+enum DocumentType {
+  DOCUMENT_TYPE_UNSPECIFIED = 0;  // Default unspecified state
+  CLINICAL_NOTES = 1;  // Medical provider notes
+  LAB_REPORT = 2;  // Laboratory test results
+  PRESCRIPTION = 3;  // Medication prescriptions
+  INSURANCE_CARD = 4;  // Insurance documentation
+  OTHER = 5;  // Other supporting materials
+}
+
+// DocumentMetadata contains document classification and tracking data
+message DocumentMetadata {
+  DocumentType type = 1;  // Document category
+  string mime_type = 2;  // Content MIME type
+  string filename = 3;  // Original filename
+  int64 size_bytes = 4;  // Document size in bytes
+  string hash = 5;  // Document content hash
+  map<string, string> custom_metadata = 6;  // Additional metadata fields
+}
+
+// ProcessingStatus tracks document processing state
+enum ProcessingStatus {
+  PROCESSING_STATUS_UNSPECIFIED = 0;  // Default unspecified state
+  UPLOADING = 1;  // Document upload in progress
+  SCANNING = 2;  // Security scanning
+  PROCESSING = 3;  // AI/ML processing
+  COMPLETED = 4;  // Processing complete
+  FAILED = 5;  // Processing failed
+}
+
+// AIAnalysis contains AI processing results
+message AIAnalysis {
+  float confidence_score = 1;  // Analysis confidence level
+  map<string, string> extracted_fields = 2;  // Extracted clinical data
+  repeated string detected_conditions = 3;  // Identified medical conditions
+  repeated string relevant_criteria = 4;  // Matched clinical criteria
+  string analysis_version = 5;  // AI model version
+  google.protobuf.Timestamp analyzed_at = 6;  // Analysis timestamp
+}
+
+// UploadDocumentRequest for streaming document upload
+message UploadDocumentRequest {
+  oneof data {
+    DocumentMetadata metadata = 1;  // First message contains metadata
+    bytes chunk = 2;  // Subsequent messages contain document chunks
+  }
+}
+
+// GetDocumentRequest for document retrieval
+message GetDocumentRequest {
+  string document_id = 1;  // Document identifier
+  bool include_content = 2;  // Whether to include document content
+}
+
+// UpdateProcessingStatusRequest for status updates
+message UpdateProcessingStatusRequest {
+  string document_id = 1;  // Document identifier
+  ProcessingStatus new_status = 2;  // New processing status
+  string status_message = 3;  // Optional status message
+  AIAnalysis analysis_results = 4;  // Optional AI analysis results
+}
