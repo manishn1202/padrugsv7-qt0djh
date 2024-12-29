@@ -1,0 +1,149 @@
+# Document Service Deployment Manifest
+# Version: 1.0.0
+# Purpose: Manages the deployment of the Document Service microservice for processing, 
+# storing, and analyzing clinical documents in the Enhanced PA System
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-service
+  namespace: epa-system
+  labels:
+    app: document-service
+    component: backend
+    part-of: epa-system
+    version: 1.0.0
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+    backup.velero.io/backup-volumes: "document-data"
+
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  
+  selector:
+    matchLabels:
+      app: document-service
+  
+  template:
+    metadata:
+      labels:
+        app: document-service
+        component: backend
+        part-of: epa-system
+    
+    spec:
+      serviceAccountName: document-service-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      
+      # Ensure pods are distributed across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - document-service
+              topologyKey: kubernetes.io/hostname
+      
+      # Ensure pods are distributed across availability zones
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: document-service
+      
+      containers:
+      - name: document-service
+        image: epa-system/document-service:1.0.0
+        imagePullPolicy: Always
+        
+        # Resource allocation based on container configuration
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 30
+        
+        # Security context for container
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        
+        # Environment configuration
+        envFrom:
+        - configMapRef:
+            name: document-service-config
+        - secretRef:
+            name: document-service-secrets
+        
+        # Volume mounts
+        volumeMounts:
+        - name: document-data
+          mountPath: /data
+        - name: tmp
+          mountPath: /tmp
+        
+      volumes:
+      - name: document-data
+        persistentVolumeClaim:
+          claimName: document-service-pvc
+      - name: tmp
+        emptyDir: {}
+      
+      # Pod termination grace period
+      terminationGracePeriodSeconds: 60
