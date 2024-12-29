@@ -1,0 +1,240 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Clinical Criteria Schema",
+  "description": "JSON Schema for validating clinical criteria evaluation rules used in prior authorization decisions",
+  "type": "object",
+  "properties": {
+    "criteria_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the clinical criteria set"
+    },
+    "medication": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the medication requiring prior authorization"
+        },
+        "drug_class": {
+          "type": "string",
+          "description": "Therapeutic class of the medication"
+        },
+        "strength_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed medication strengths"
+        },
+        "max_quantity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum allowed quantity per fill"
+        },
+        "max_days_supply": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum allowed days supply"
+        }
+      },
+      "required": ["drug_name"]
+    },
+    "diagnosis_requirements": {
+      "type": "object",
+      "properties": {
+        "required_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{2}\\.[0-9]{1,2}$",
+            "description": "ICD-10 diagnosis codes that qualify for approval"
+          },
+          "minItems": 1
+        },
+        "excluded_codes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][0-9]{2}\\.[0-9]{1,2}$",
+            "description": "ICD-10 diagnosis codes that disqualify for approval"
+          }
+        },
+        "code_combinations": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][0-9]{2}\\.[0-9]{1,2}$"
+            },
+            "minItems": 2,
+            "description": "Required combinations of ICD-10 codes"
+          }
+        }
+      },
+      "required": ["required_codes"]
+    },
+    "lab_requirements": {
+      "type": "object",
+      "properties": {
+        "required_tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test_name": {
+                "type": "string",
+                "description": "Name of the required lab test"
+              },
+              "loinc_code": {
+                "type": "string",
+                "pattern": "^[0-9]{4,}-[0-9]$",
+                "description": "LOINC code for the lab test"
+              },
+              "min_value": {
+                "type": "number",
+                "description": "Minimum required test value"
+              },
+              "max_value": {
+                "type": "number",
+                "description": "Maximum allowed test value"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Unit of measurement"
+              },
+              "timeframe_days": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum age of test results in days"
+              }
+            },
+            "required": ["test_name", "loinc_code"]
+          }
+        }
+      }
+    },
+    "treatment_history": {
+      "type": "object",
+      "properties": {
+        "required_medications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "drug_name": {
+                "type": "string",
+                "description": "Name of required previous medication"
+              },
+              "min_duration_days": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Minimum required treatment duration"
+              },
+              "timeframe_days": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Lookback period for treatment history"
+              },
+              "failure_required": {
+                "type": "boolean",
+                "description": "Whether treatment failure is required"
+              }
+            },
+            "required": ["drug_name", "min_duration_days"]
+          }
+        },
+        "excluded_medications": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Medications that disqualify approval"
+          }
+        }
+      }
+    },
+    "clinical_documentation": {
+      "type": "object",
+      "properties": {
+        "required_documents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CHART_NOTES",
+              "LAB_RESULTS",
+              "IMAGING_RESULTS",
+              "TREATMENT_HISTORY",
+              "SPECIALIST_CONSULT"
+            ],
+            "description": "Types of required clinical documentation"
+          }
+        },
+        "document_timeframe_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum age of documents in days"
+        }
+      }
+    },
+    "approval_criteria": {
+      "type": "object",
+      "properties": {
+        "auto_approval_enabled": {
+          "type": "boolean",
+          "description": "Whether automated approval is allowed"
+        },
+        "min_criteria_match_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum required criteria match score for approval"
+        },
+        "required_criteria_groups": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "DIAGNOSIS",
+                "LAB_RESULTS",
+                "TREATMENT_HISTORY",
+                "DOCUMENTATION"
+              ]
+            },
+            "minItems": 1,
+            "description": "Groups of criteria required for approval"
+          }
+        }
+      },
+      "required": ["auto_approval_enabled", "min_criteria_match_score"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when criteria were created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when criteria were last updated"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the criteria set"
+    }
+  },
+  "required": [
+    "criteria_id",
+    "medication",
+    "diagnosis_requirements",
+    "approval_criteria",
+    "created_at",
+    "version"
+  ],
+  "additionalProperties": false
+}
