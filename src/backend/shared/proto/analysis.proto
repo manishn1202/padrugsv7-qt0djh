@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+package epa.analysis;
+
+// External imports
+import "google/protobuf/timestamp.proto"; // v3.0.0 - Standard timestamp type
+import "document.proto"; // Internal import for document types
+import "authorization.proto"; // Internal import for authorization types
+
+// Go package declaration for code generation
+option go_package = "github.com/epa/proto/analysis";
+
+// AnalysisService provides gRPC endpoints for Gen AI-powered document analysis
+service AnalysisService {
+  // Analyzes clinical documents using Gen AI for relevant information extraction
+  rpc AnalyzeDocument(AnalyzeDocumentRequest) returns (AnalyzeDocumentResponse) {}
+  
+  // Matches clinical criteria against authorization requirements
+  rpc MatchCriteria(MatchCriteriaRequest) returns (MatchCriteriaResponse) {}
+  
+  // Streams real-time analysis updates for large documents
+  rpc StreamAnalysis(StreamAnalysisRequest) returns (stream AnalysisUpdate) {}
+}
+
+// AnalysisType enumerates supported analysis categories
+enum AnalysisType {
+  ANALYSIS_TYPE_UNSPECIFIED = 0;
+  CLINICAL_EXTRACTION = 1;  // Extract clinical findings
+  CRITERIA_MATCHING = 2;    // Match authorization criteria
+  MEDICATION_REVIEW = 3;    // Review medication history
+  CONTRAINDICATION_CHECK = 4; // Check for contraindications
+  FULL_ANALYSIS = 5;        // Comprehensive analysis
+}
+
+// AnalyzeDocumentRequest for document analysis
+message AnalyzeDocumentRequest {
+  epa.document.Document document = 1;      // Document to analyze
+  AnalysisType analysis_type = 2;          // Type of analysis to perform
+  AnalysisContext context = 3;             // Analysis context
+  int32 batch_size = 4;                    // Processing batch size
+}
+
+// AnalyzeDocumentResponse containing analysis results
+message AnalyzeDocumentResponse {
+  string analysis_id = 1;                  // Unique analysis identifier
+  ExtractedData extracted_data = 2;        // Extracted clinical information
+  float confidence_score = 3;              // Overall confidence score
+  google.protobuf.Timestamp analyzed_at = 4; // Analysis timestamp
+  ValidationResults validation_results = 5; // Validation results
+}
+
+// ExtractedData contains structured clinical information
+message ExtractedData {
+  repeated ClinicalFinding clinical_findings = 1;  // Clinical findings
+  repeated Medication medications = 2;             // Medication details
+  repeated Diagnosis diagnoses = 3;               // Diagnosis information
+  map<string, CodingSystem> coding_systems = 4;   // Coding system mappings
+  ConfidenceThresholds confidence_thresholds = 5; // Confidence settings
+}
+
+// ClinicalFinding represents an extracted clinical observation
+message ClinicalFinding {
+  string finding_id = 1;           // Unique finding identifier
+  string description = 2;          // Finding description
+  string source_text = 3;          // Original text
+  float confidence = 4;            // Extraction confidence
+  map<string, string> codes = 5;   // Standardized codes
+  google.protobuf.Timestamp observation_date = 6; // Observation date
+}
+
+// Medication represents extracted medication information
+message Medication {
+  string medication_id = 1;        // Unique medication identifier
+  string name = 2;                 // Medication name
+  string ndc_code = 3;             // NDC code
+  string strength = 4;             // Strength
+  string form = 5;                 // Dosage form
+  string sig = 6;                  // Administration instructions
+  float confidence = 7;            // Extraction confidence
+}
+
+// Diagnosis represents extracted diagnosis information
+message Diagnosis {
+  string diagnosis_id = 1;         // Unique diagnosis identifier
+  string description = 2;          // Diagnosis description
+  repeated string icd_codes = 3;   // ICD-10 codes
+  float confidence = 4;            // Extraction confidence
+  bool is_primary = 5;             // Primary diagnosis flag
+}
+
+// CodingSystem represents a medical coding system
+message CodingSystem {
+  string system_id = 1;            // Coding system identifier
+  string version = 2;              // System version
+  map<string, string> mappings = 3; // Code mappings
+}
+
+// ConfidenceThresholds for extraction validation
+message ConfidenceThresholds {
+  float minimum_overall = 1;       // Minimum overall confidence
+  float minimum_clinical = 2;      // Minimum clinical confidence
+  float minimum_medication = 3;    // Minimum medication confidence
+  float minimum_diagnosis = 4;     // Minimum diagnosis confidence
+}
+
+// ValidationResults contains validation outcomes
+message ValidationResults {
+  bool passed_validation = 1;      // Overall validation status
+  repeated ValidationError errors = 2;  // Validation errors
+  repeated string warnings = 3;     // Validation warnings
+  map<string, float> scores = 4;    // Validation scores
+}
+
+// ValidationError represents a validation failure
+message ValidationError {
+  string error_code = 1;           // Error code
+  string message = 2;              // Error message
+  string field = 3;                // Affected field
+  Severity severity = 4;           // Error severity
+}
+
+// Severity levels for validation errors
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;
+  WARNING = 2;
+  ERROR = 3;
+  CRITICAL = 4;
+}
+
+// AnalysisContext provides context for analysis
+message AnalysisContext {
+  repeated epa.authorization.AuthorizationRequest authorization_requests = 1;
+  repeated string required_criteria = 2;    // Required clinical criteria
+  HistoricalContext historical_context = 3; // Historical data context
+  AnalysisPreferences analysis_preferences = 4; // Analysis preferences
+}
+
+// HistoricalContext provides historical data for analysis
+message HistoricalContext {
+  repeated ClinicalFinding prior_findings = 1;    // Prior findings
+  repeated Medication prior_medications = 2;       // Medication history
+  repeated Diagnosis prior_diagnoses = 3;         // Diagnosis history
+  map<string, string> context_metadata = 4;       // Additional context
+}
+
+// AnalysisPreferences configures analysis behavior
+message AnalysisPreferences {
+  bool extract_demographics = 1;    // Extract patient demographics
+  bool validate_codes = 2;          // Validate medical codes
+  bool include_raw_text = 3;        // Include source text
+  map<string, float> thresholds = 4; // Custom thresholds
+}
+
+// MatchCriteriaRequest for criteria matching
+message MatchCriteriaRequest {
+  ExtractedData clinical_data = 1;  // Extracted clinical data
+  repeated string criteria_ids = 2;  // Criteria to match
+  AnalysisContext context = 3;       // Matching context
+}
+
+// MatchCriteriaResponse with matching results
+message MatchCriteriaResponse {
+  string match_id = 1;              // Unique match identifier
+  repeated CriteriaMatch matches = 2; // Matching results
+  float overall_score = 3;           // Overall match score
+  ValidationResults validation = 4;   // Validation results
+}
+
+// CriteriaMatch represents a single criteria match
+message CriteriaMatch {
+  string criteria_id = 1;           // Criteria identifier
+  bool is_matched = 2;              // Match status
+  float confidence = 3;             // Match confidence
+  repeated string evidence = 4;      // Supporting evidence
+  map<string, string> metadata = 5;  // Match metadata
+}
+
+// StreamAnalysisRequest for streaming analysis
+message StreamAnalysisRequest {
+  epa.document.Document document = 1;  // Document to analyze
+  AnalysisType analysis_type = 2;      // Analysis type
+  int32 chunk_size = 3;                // Processing chunk size
+}
+
+// AnalysisUpdate for streaming updates
+message AnalysisUpdate {
+  string analysis_id = 1;              // Analysis identifier
+  float progress = 2;                  // Progress percentage
+  ExtractedData partial_results = 3;   // Partial results
+  string status = 4;                   // Processing status
+  google.protobuf.Timestamp timestamp = 5; // Update timestamp
+}
