@@ -1,0 +1,133 @@
+# API Version: policy/v1beta1 (Kubernetes 1.27+)
+# Purpose: Define strict pod security policies for EPA system ensuring HIPAA compliance
+# Dependencies: k8s.io/api/policy/v1beta1
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: epa-restricted-psp
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: security
+    app.kubernetes.io/version: 1.0.0
+    security.epa.io/policy-type: restricted
+    security.epa.io/compliance: hipaa
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+
+spec:
+  privileged: false  # Prohibit privileged containers
+  allowPrivilegeEscalation: false  # Prevent privilege escalation
+  
+  # Required to drop all capabilities and only add specific ones
+  requiredDropCapabilities:
+    - ALL
+  defaultAddCapabilities: []
+  allowedCapabilities: []
+  
+  # Volume restrictions
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  
+  # Host namespace restrictions
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  
+  # Container runtime security
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+    ranges:
+      - min: 1000
+        max: 65535
+  
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  
+  # SELinux context requirements
+  seLinux:
+    rule: 'RunAsAny'  # Managed by cluster-level SELinux
+  
+  # Read-only root filesystem
+  readOnlyRootFilesystem: true
+  
+  # Forbidden host paths
+  allowedHostPaths: []
+  
+  # Sysctls restrictions
+  forbiddenSysctls:
+    - '*'
+  
+  # Additional security controls
+  hostPorts:
+    - min: 0
+      max: 0
+  
+  # Secure computing mode
+  seccompProfiles:
+    - 'runtime/default'
+  
+  # AppArmor restrictions
+  annotations:
+    apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+
+---
+# RBAC binding for PSP
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: epa-psp-restricted
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: security
+rules:
+  - apiGroups: ['policy']
+    resources: ['podsecuritypolicies']
+    verbs: ['use']
+    resourceNames: ['epa-restricted-psp']
+
+---
+# Bind PSP to service accounts in EPA namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: epa-psp-restricted
+  namespace: epa-system
+  labels:
+    app.kubernetes.io/part-of: epa-system
+    app.kubernetes.io/component: security
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: epa-psp-restricted
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: epa-system
+  - kind: ServiceAccount
+    name: epa-system
+    namespace: epa-system
